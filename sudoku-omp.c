@@ -10,7 +10,7 @@
  * ##### ## ##															*
  * ##### ## ##															*
  * 																		*
- * Serial implementation												*
+ * OpenMP implementation												*
  * 																		*
  ************************************************************************/
 
@@ -20,9 +20,9 @@
 
 unsigned int MAX_LINE_SIZE = 10;
 
-int charToInt(char c) {
-	return c - '0';
-}
+// int charToInt(char c);
+int charToInt(char c) { return c - '0'; }
+
 
 void printBoard(int **board, int N) {
 	
