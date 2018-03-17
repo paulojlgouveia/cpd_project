@@ -34,19 +34,20 @@ do
 	do
 		total=$((total+1))
 		outputed=${expected//'expected/'/'output/'}
+		name=${expected//'expected/'/''}
 		
 		#ignore blank spaces at the end of line
 		diff -Z ${expected} ${outputed} > /dev/null
 		
 		if [ $? == 0 ]; then
 			correct=$((correct+1))
-			echo -e "${outputed} \t-> ${green}Passed${end}"
+			echo -e "${name}\t-> ${green}Passed${end}"
 			
 		elif [ $? == 1 ]; then
-			echo -e "${outputed} \t-> ${red}Failed${end}"
+			echo -e "${name}\t-> ${red}Failed${end}"
 			
 		else
-			echo -e "${outputed} \t-> ${underline}Error${end}"
+			echo -e "${name}\t-> ${underline}Error${end}"
 		fi
 			
 	done
