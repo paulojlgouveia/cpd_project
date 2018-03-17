@@ -18,7 +18,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-unsigned int MAX_LINE_SIZE = 10;
+// 8 spaces, 9 cells, '\n', possible '\r' on windows
+unsigned int MAX_LINE_SIZE = 19; 
 
 int charToInt(char c) {
 	return c - '0';
@@ -33,7 +34,7 @@ void printBoard(int **board, int N) {
 		printf("\n");
 	}
 	
-	printf("\n");
+// 	printf("\n");
 }
 
 
@@ -46,7 +47,7 @@ int main(int argc, char *argv[]) {
 	char* cell;
 	
 	if(argc < 2){
-		printf("missing argument.\n usage: sudoku-serial [filename]\n");
+		printf("missing argument.\nusage: sudoku-serial <filename>\n");
 		exit(1);
 	}
 	
@@ -71,11 +72,13 @@ int main(int argc, char *argv[]) {
 		// initialize the board
 		for (int i = 0; i < n ; i++) {
 			if (fgets(line, MAX_LINE_SIZE, file) != NULL) {
+				
 				cell = strtok(line, " ");
 				for (int j = 0; j < n; j++) {
 					board[i][j] = charToInt(*cell);
 					cell = strtok(NULL, " ");
 				}
+				
 			} else {
 				printf("ill formed file '%s'\n", argv[1]);
 				exit(3);

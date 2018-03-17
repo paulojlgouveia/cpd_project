@@ -1,10 +1,10 @@
 
 FLAGS=-fopenmp -ansi -pedantic -Wall -Wno-unused-result -O3 -lm -std=c99
 
-in=input/
-out=output/
+out=""
 
-all: compile run
+
+all: compile test
 
 compile: clean serial omp mpi
 
@@ -29,15 +29,21 @@ mpi:
 	
 	
 run:
-	./sudoku-serial input/ex1.in
-# 	./sudoku-omp input/ex1.in
-# 	./sudoku-mpi input/ex1.in
-	
+	@for f in input/*.in; do echo '\n'$$f; ./sudoku-serial $$f; done
+# 	@for file in input/*.in; do echo $$file; ./sudoku-omp $$file; done
+# 	@for file in input/*.in; do echo $$file; ./sudoku-mpi $$file; done
+	@echo
+
+
+test: compile
+	@echo
+	@./tests.sh
+
 
 valgrind: compile
-	valgrind -v --leak-check=full ./sudoku-serial
-# 	valgrind -v --leak-check=full ./sudoku-omp
-# 	valgrind -v --leak-check=full ./sudoku-mpi
+	valgrind -v --leak-check=full ./sudoku-serial input/ex2.in
+# 	valgrind -v --leak-check=full ./sudoku-omp input/ex2.in
+# 	valgrind -v --leak-check=full ./sudoku-mpi input/ex2.in
 	
 	
 submission:
