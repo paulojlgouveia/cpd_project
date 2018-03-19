@@ -7,7 +7,7 @@
  * group 4, Alameda														*
  * 																		*
  * 75657 Paulo Gouveia													*
- * ##### ## ##															*
+ * 76213 Gonçalo Lopes													*
  * ##### ## ##															*
  * 																		*
  * Serial implementation												*
@@ -20,6 +20,14 @@
 
 // 8 spaces, 9 cells, '\0', '\n', possible '\r' on windows
 unsigned int MAX_LINE_SIZE = 20; 
+
+typedef struct{
+	int x;
+	int y;
+} position;
+
+int validatePosition(position p, int test);
+int* arrayNAND(int* a1, int* a2);
 
 int charToInt(char c) {
 	return c - '0';
@@ -35,6 +43,35 @@ void printBoard(int ***board, int N) {
 // 	printf("\n");
 }
 
+//Returns an the block index between 0 and l-1
+//n received for arg validation
+position getBlock(position cellPosition, int l, int n){
+	position blockPosition;
+
+	/*if(!validatePosition(cellPosition,n))
+		return -1; <-- what do i return here */
+
+	blockPosition.x = cellPosition.x / l;
+	blockPosition.y = cellPosition.y / l;
+
+	return blockPosition;
+}
+
+//returns the block's top left position, with this we can easily obtain
+//the other positions of the block
+position getBlockTopLeft(position blockPosition, int l){
+	position topLeft;
+
+	/*if(!validatePosition(blockPosition,l))
+		return -1; <-- what do i return here */
+
+	topLeft.x = blockPosition.x * l;
+	topLeft.y = blockPosition.y * l;
+
+	return topLeft;
+}
+
+int validatePosition(position p, int test){ return (p.x < 0 || p.x >= test || p.y < 0 || p.y >= test);}
 
 int solved(int ***board, int N) {
 	// FIXME
@@ -46,20 +83,42 @@ int solved(int ***board, int N) {
 	return 1;
 }
 
-
+/*
 
 int** getBestCandidate(int ***board) {
 	// FIXME
 	return board[0][0];
 }
+*/
 
+void checkBlockLineColumn(int*** board,int l,int n, position pos) {
+	int i, removables[n];
+	position blockPos = getBlockTopLeft(getBlock(pos,l,n),l);
 
-void checkBlockLineColumn() {
-	// FIXME
+	//Gather candidates to remove in row and column
+	for(i = 0; i < n;i++){
+
+		//Check in Row
+		if(board[i][pos.y][0])
+			removables[board[i][pos.y][0]] = board[i][pos.y][0];
+		//Check in Column
+		if(board[pos.x][i][0] != 0)
+			removables[board[pos.x][i][0]] = board[pos.x][i][0];
+
+		//Check in Block
+		if(board[blockPos.x + (i % n)][blockPos.y + ((int) (i/n))][0])
+			removables[board[blockPos.x + (i % n)][blockPos.y + ((int) (i/n))][0]] = board[blockPos.x + (i % n)][blockPos.y + ((int) (i/n))][0];
+	}
 	
+	board[pos.x][pos.y] = arrayNAND(board[pos.x][pos.y], removables);
+
 	return;
 }
 
+int* arrayNAND(int* a1, int* a2){
+	// FIXME
+	return a1;
+}
 
 void uniqueCanditate() {
 	// FIXME
@@ -110,8 +169,6 @@ void swordfish() {
 }
 
 
-
-
 int main(int argc, char *argv[]) {
 	
 	FILE *file;
@@ -158,7 +215,8 @@ int main(int argc, char *argv[]) {
 						
 					if (value > 0)
 						board[i][j][0] = value;
-					
+					else
+						board[i][j][0] = 0;
 					cell = strtok(NULL, " ");
 				}
 				
@@ -179,6 +237,11 @@ int main(int argc, char *argv[]) {
 	// </FIXME>
 	
 	
+
+	// <scrapbook>
+
+	// </scrapbook>
+
 	// display solution
 	printBoard(board, n);
 	
