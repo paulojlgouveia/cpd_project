@@ -28,7 +28,7 @@ mpi:
 # 	@gcc $(FLAGS) sudoku-mpi.c -o sudoku-mpi
 	
 	
-run:
+run: compile
 	@for f in input/*.in; do echo '\n'$$f; ./sudoku-serial $$f; done
 # 	@for file in input/*.in; do echo $$file; ./sudoku-omp $$file; done
 # 	@for file in input/*.in; do echo $$file; ./sudoku-mpi $$file; done

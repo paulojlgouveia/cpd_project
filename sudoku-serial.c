@@ -18,31 +18,106 @@
 #include <stdlib.h>
 #include <string.h>
 
-// 8 spaces, 9 cells, '\n', possible '\r' on windows
-unsigned int MAX_LINE_SIZE = 19; 
+// 8 spaces, 9 cells, '\0', '\n', possible '\r' on windows
+unsigned int MAX_LINE_SIZE = 20; 
 
 int charToInt(char c) {
 	return c - '0';
 }
 
-void printBoard(int **board, int N) {
-	
+void printBoard(int ***board, int N) {
 	for (int i = 0; i < N; i++) {
 		for (int j = 0; j < N; j++) {
-			printf("%d ", board[i][j]);
+			printf("%d ", board[i][j][0]);
 		}
 		printf("\n");
 	}
-	
 // 	printf("\n");
 }
+
+
+int solved(int ***board, int N) {
+	// FIXME
+	for (int i = 0; i < N; i++)
+		for (int j = 0; j < N; j++)
+			if (board[i][j][0] == 0)
+				return 0;
+			
+	return 1;
+}
+
+
+
+int** getBestCandidate(int ***board) {
+	// FIXME
+	return board[0][0];
+}
+
+
+void checkBlockLineColumn() {
+	// FIXME
+	
+	return;
+}
+
+
+void uniqueCanditate() {
+	// FIXME
+	
+	return;
+}
+
+
+void lineRemoval() {
+	// FIXME
+	
+	return;
+}
+
+
+void blockRemoval() {
+	// FIXME
+	
+	return;
+}
+
+
+void nakedSubset() {
+	// FIXME
+	
+	return;
+}
+
+
+void hiddenSubset() {
+	// FIXME
+	
+	return;
+}
+
+
+void xWing() {
+	// FIXME
+	
+	return;
+}
+
+
+void swordfish() {
+	// FIXME
+	
+	return;
+}
+
+
 
 
 int main(int argc, char *argv[]) {
 	
 	FILE *file;
 	int l, n;
-	int** board;
+	int value;
+	int*** board;
 	char line[MAX_LINE_SIZE];
 	char* cell;
 	
@@ -64,10 +139,14 @@ int main(int argc, char *argv[]) {
 		n = l * l;
 // 		printf("l = %d, n = %d\n", l, n);
 		
-		board = (int**) malloc(n * sizeof(int*));
-		for (int t = 0; t < n; t++) {
-			board[t] = (int*) malloc(n * sizeof(int));	
+		board = (int***) malloc(n * sizeof(int**));
+		for (int i = 0; i < n; i++) {
+			board[i] = (int**) malloc(n * sizeof(int*));
+			for (int j = 0; j < n; j++) {
+				board[i][j] = (int*) malloc(n * sizeof(int));
+			}
 		}
+		
 		
 		// initialize the board
 		for (int i = 0; i < n ; i++) {
@@ -75,7 +154,11 @@ int main(int argc, char *argv[]) {
 				
 				cell = strtok(line, " ");
 				for (int j = 0; j < n; j++) {
-					board[i][j] = charToInt(*cell);
+					value = charToInt(*cell);
+						
+					if (value > 0)
+						board[i][j][0] = value;
+					
 					cell = strtok(NULL, " ");
 				}
 				
@@ -89,17 +172,22 @@ int main(int argc, char *argv[]) {
 	}
 	
 	
-	// FIXME
-	// solve the thing here
-	// FIXME
+	// <FIXME> solve the thing here
+	
+	
+	
+	// </FIXME>
 	
 	
 	// display solution
 	printBoard(board, n);
 	
 	// free the memory
-	for (int t = 0; t < n; t++) {
-		free(board[t]);  
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < n; j++) {
+			free(board[i][j]);
+		}
+		free(board[i]);
 	}     
 	free(board);
 
@@ -107,4 +195,3 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
-// int charToInt(char c) { return c - '0'; }
