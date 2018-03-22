@@ -35,6 +35,15 @@ void Position(position *p, int size, int x, int y) {
 	p->checked = 0;
 }
 
+void printCell(position* p, int size) {
+	char* checked = (p->checked == 0)? "True " : "False";
+	
+	printf("(%d,%d) %s [", p->x, p->y, checked);
+	for (int t = 0; t < size; t++)
+		printf(" %d", p->candidates[t]);
+	
+	printf(" ]\n");
+}
 
 
 
@@ -48,7 +57,7 @@ int charToInt(char c) {
 void printBoard(position **board, int N) {
 	for (int i = 0; i < N; i++) {
 		for (int j = 0; j < N; j++) {
-			printf("%d ", board[i][j].candidates[0]);
+			printf("%d ", board[i][j].checked);
 		}
 		printf("\n");
 	}
@@ -209,16 +218,6 @@ int main(int argc, char *argv[]) {
 		n = l * l;
 // 		printf("l = %d, n = %d\n", l, n);
 		
-// 		board = (int***) malloc(n * sizeof(int**));
-// 		for (int i = 0; i < n; i++) {
-// 			board[i] = (int**) malloc(n * sizeof(int*));
-// 			for (int j = 0; j < n; j++) {
-// 				board[i][j] = (int*) malloc(n * sizeof(int));
-// 			}
-// 		}
-		
-		
-		
 		board = (position**) malloc(n * sizeof(position*));
 		for (int i = 0; i < n; i++) {
 			board[i] = (position*) malloc(n * sizeof(position));
@@ -226,8 +225,7 @@ int main(int argc, char *argv[]) {
 				Position(&board[i][j], n, i, j);
 			}
 		}
-			printBoard(board, n);
-
+		
 		
 		// initialize the board
 		for (int i = 0; i < n ; i++) {
@@ -237,15 +235,13 @@ int main(int argc, char *argv[]) {
 				for (int j = 0; j < n; j++) {
 					value = charToInt(*cell);
 						
-					if (value > 0) {
+					if (value > 0)
 						board[i][j].checked = value;
 						
-					} else {
-						for (int t = 1; 1 <= n; t++)
+					else
+						for (int t = 1; t <= n; t++)
 							board[i][j].candidates[t-1] = t;
-					}
 					
-						printf("%d %d\n", board[0][0].x, board[0][0].y);
 					cell = strtok(NULL, " ");
 				}
 				
