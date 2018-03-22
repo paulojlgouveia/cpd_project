@@ -21,10 +21,23 @@
 // 8 spaces, 9 cells, '\0', '\n', possible '\r' on windows
 unsigned int MAX_LINE_SIZE = 20; 
 
-typedef struct{
-	int x;
-	int y;
+typedef struct {
+	int *candidates;
+	int x, y;
+	int checked;
 } position;
+
+position* Position(int size, int x, int y) {
+	position *p = malloc(sizeof(position));
+	p->candidates = malloc(size * sizeof(int));
+	p->x = x;
+	p->y = y;
+	p-> checked = 0;
+	return p;
+}
+
+
+
 
 int validatePosition(position p, int test);
 int* arrayNAND(int* a1, int* a2);
@@ -33,10 +46,10 @@ int charToInt(char c) {
 	return c - '0';
 }
 
-void printBoard(int ***board, int N) {
+void printBoard(position ***board, int N) {
 	for (int i = 0; i < N; i++) {
 		for (int j = 0; j < N; j++) {
-			printf("%d ", board[i][j][0]);
+			printf("%d ", board[i][j]->candidates[0]);
 		}
 		printf("\n");
 	}
@@ -97,21 +110,22 @@ void checkBlockLineColumn(int*** board,int l,int n, position pos) {
 
 	//Gather candidates to remove in row and column
 	for(i = 0; i < n;i++){
-
-		//Check in Row
+		
+		// check in row
 		if(board[i][pos.y][0])
 			removables[board[i][pos.y][0]] = board[i][pos.y][0];
-		//Check in Column
+		
+		// check in column
 		if(board[pos.x][i][0] != 0)
 			removables[board[pos.x][i][0]] = board[pos.x][i][0];
-
-		//Check in Block
+		
+		// check in block
 		if(board[blockPos.x + (i % n)][blockPos.y + ((int) (i/n))][0])
 			removables[board[blockPos.x + (i % n)][blockPos.y + ((int) (i/n))][0]] = board[blockPos.x + (i % n)][blockPos.y + ((int) (i/n))][0];
 	}
 	
 	board[pos.x][pos.y] = arrayNAND(board[pos.x][pos.y], removables);
-
+	
 	return;
 }
 
@@ -174,7 +188,7 @@ int main(int argc, char *argv[]) {
 	FILE *file;
 	int l, n;
 	int value;
-	int*** board;
+	position*** board;
 	char line[MAX_LINE_SIZE];
 	char* cell;
 	
@@ -196,11 +210,21 @@ int main(int argc, char *argv[]) {
 		n = l * l;
 // 		printf("l = %d, n = %d\n", l, n);
 		
-		board = (int***) malloc(n * sizeof(int**));
+// 		board = (int***) malloc(n * sizeof(int**));
+// 		for (int i = 0; i < n; i++) {
+// 			board[i] = (int**) malloc(n * sizeof(int*));
+// 			for (int j = 0; j < n; j++) {
+// 				board[i][j] = (int*) malloc(n * sizeof(int));
+// 			}
+// 		}
+		
+		
+		
+		board = (position***) malloc(n * sizeof(position**));
 		for (int i = 0; i < n; i++) {
-			board[i] = (int**) malloc(n * sizeof(int*));
+			board[i] = (position**) malloc(n * sizeof(position*));
 			for (int j = 0; j < n; j++) {
-				board[i][j] = (int*) malloc(n * sizeof(int));
+				board[i][j] = Position(n, i, j);
 			}
 		}
 		
@@ -213,10 +237,14 @@ int main(int argc, char *argv[]) {
 				for (int j = 0; j < n; j++) {
 					value = charToInt(*cell);
 						
-					if (value > 0)
-						board[i][j][0] = value;
-					else
-						board[i][j][0] = 0;
+					if (value > 0) {
+						board[i][j]->checked = value;
+						printf("FUUUUCK\n");
+					} else {
+						for (int t = 1; 1 <= n; t++)
+							board[i][j]->candidates[t-1] = t;
+					}
+					
 					cell = strtok(NULL, " ");
 				}
 				
