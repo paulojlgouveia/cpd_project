@@ -27,169 +27,30 @@ typedef struct {
 	int checked;
 } position;
 
-void Position(position *p, int size, int x, int y) {
-// 	position *p = malloc(sizeof(position));
-	p->candidates = malloc(size * sizeof(int));
-	p->x = x;
-	p->y = y;
-	p->checked = 0;
-}
-
-void printCell(position* p, int size) {
-// 	char* checked = (p->checked == 0)? "True " : "False";
-// 	printf("(%d,%d) %s [", p->x, p->y, checked);
-	
-	printf("(%d,%d) %d [", p->x, p->y, p->checked);
-	for (int t = 0; t < size; t++)
-		printf(" %d", p->candidates[t]);
-	
-	printf(" ]\n");
-}
+typedef struct{
+	int x,y;
+} coordinate;
 
 
 
-int validatePosition(position p, int test);
 int* arrayNAND(int* a1, int* a2);
 
-int charToInt(char c) {
-	return c - '0';
-}
+void printCell(position* p, int size);
+int charToInt(char c);
+void printBoard(position **board, int N);
 
-void printBoard(position **board, int N) {
-	for (int i = 0; i < N; i++) {
-		for (int j = 0; j < N; j++) {
-			printf("%d ", board[i][j].checked);
-		}
-		printf("\n");
-	}
-// 	printf("\n");
-}
+coordinate getBlockCoordinate(position *cellPosition, int l);
+position *getBlockTopLeft(position*** board, coordinate blockCoordinate, int l);
 
-//Returns an the block index between 0 and l-1
-//n received for arg validation
-position getBlock(position cellPosition, int l, int n){
-	position blockPosition;
+int solved(position **board, int N);
+void checkBlockLineColumn(position*** board,int l,int n, position *pos) ;
 
-	/*if(!validatePosition(cellPosition,n))
-		return -1; <-- what do i return here */
+int* arrayNAND(int* a1, int* a2);
 
-	blockPosition.x = cellPosition.x / l;
-	blockPosition.y = cellPosition.y / l;
+void uniqueCanditate();
+void removeCandidates(int* a1, int* a2, int n);
 
-	return blockPosition;
-}
-
-//returns the block's top left position, with this we can easily obtain
-//the other positions of the block
-position getBlockTopLeft(position blockPosition, int l){
-	position topLeft;
-
-	/*if(!validatePosition(blockPosition,l))
-		return -1; <-- what do i return here */
-
-	topLeft.x = blockPosition.x * l;
-	topLeft.y = blockPosition.y * l;
-
-	return topLeft;
-}
-
-int validatePosition(position p, int test){ return (p.x < 0 || p.x >= test || p.y < 0 || p.y >= test);}
-
-int solved(position **board, int N) {
-	for (int i = 0; i < N; i++)
-		for (int j = 0; j < N; j++)
-			if (board[i][j].checked == 0)
-				return 0;
-			
-	return 1;
-}
-
-/*
-
-int** getBestCandidate(int ***board) {
-	// FIXME
-	return board[0][0];
-}
-*/
-
-void checkBlockLineColumn(int*** board,int l,int n, position pos) {
-	int i, removables[n];
-	position blockPos = getBlockTopLeft(getBlock(pos,l,n),l);
-
-	//Gather candidates to remove in row and column
-	for(i = 0; i < n;i++){
-		
-		// check in row
-		if(board[i][pos.y][0])
-			removables[board[i][pos.y][0]] = board[i][pos.y][0];
-		
-		// check in column
-		if(board[pos.x][i][0] != 0)
-			removables[board[pos.x][i][0]] = board[pos.x][i][0];
-		
-		// check in block
-		if(board[blockPos.x + (i % n)][blockPos.y + ((int) (i/n))][0])
-			removables[board[blockPos.x + (i % n)][blockPos.y + ((int) (i/n))][0]] = board[blockPos.x + (i % n)][blockPos.y + ((int) (i/n))][0];
-	}
-	
-	board[pos.x][pos.y] = arrayNAND(board[pos.x][pos.y], removables);
-	
-	return;
-}
-
-int* arrayNAND(int* a1, int* a2){
-	// FIXME
-	return a1;
-}
-
-void uniqueCanditate() {
-	// FIXME
-	
-	return;
-}
-
-
-void lineRemoval() {
-	// FIXME
-	
-	return;
-}
-
-
-void blockRemoval() {
-	// FIXME
-	
-	return;
-}
-
-
-void nakedSubset() {
-	// FIXME
-	
-	return;
-}
-
-
-void hiddenSubset() {
-	// FIXME
-	
-	return;
-}
-
-
-void xWing() {
-	// FIXME
-	
-	return;
-}
-
-
-void swordfish() {
-	// FIXME
-	
-	return;
-}
-
+void Position(position *p, int size, int x, int y);
 
 int main(int argc, char *argv[]) {
 	
@@ -262,10 +123,6 @@ int main(int argc, char *argv[]) {
 	// </FIXME>
 	
 	
-
-	// <scrapbook>
-
-	// </scrapbook>
 	
 
 	// display solution
@@ -281,8 +138,147 @@ int main(int argc, char *argv[]) {
 		free(board[i]);
 	}     
 	free(board);
-
 	
 	return 0;
 }
 
+void Position(position *p, int size, int x, int y) {
+// 	position *p = malloc(sizeof(position));
+	p->candidates = malloc(size * sizeof(int));
+	p->x = x;
+	p->y = y;
+	p->checked = 0;
+}
+
+void printBoard(position **board, int N) {
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++) {
+			printf("%d ", board[i][j].checked);
+		}
+		printf("\n");
+	}
+// 	printf("\n");
+}
+
+void printCell(position* p, int size) {
+// 	char* checked = (p->checked == 0)? "True " : "False";
+// 	printf("(%d,%d) %s [", p->x, p->y, checked);
+	
+	printf("(%d,%d) %d [", p->x, p->y, p->checked);
+	for (int t = 0; t < size; t++)
+		printf(" %d", p->candidates[t]);
+	
+	printf(" ]\n");
+}
+
+int charToInt(char c) {
+	return c - '0';
+}
+
+//Returns a 0-indexed coordinate of the block
+//e.g., in a 9x9, 3x3 blocks -> (5,5) returns (1,1), (8,8) returns (2,2)
+coordinate getBlockCoordinate(position *cellPosition, int l){
+	coordinate blockCoordinate;
+
+	blockCoordinate.x = cellPosition->x / l;
+	blockCoordinate.y = cellPosition->y / l;
+
+	return blockCoordinate;
+}
+
+//returns the block's top left position
+//e.g., in a 4x4 sudoku, 2x2 blocks -> (1,0) returns (2,0)
+position *getBlockTopLeft(position*** board, coordinate blockCoordinate, int l){ 
+	return board[blockCoordinate.x * l][blockCoordinate.y * l]; 
+}
+
+int solved(position **board, int N) {
+	for (int i = 0; i < N; i++)
+		for (int j = 0; j < N; j++)
+			if (board[i][j].checked == 0)
+				return 0;
+			
+	return 1;
+}
+
+
+void checkBlockLineColumn(position*** board,int l,int n, position *pos) {
+	int i,numX, numY, numBlock, removables[n];
+	position *blockPos = getBlockTopLeft(board,getBlockCoordinate(pos,l),l);
+
+	//Gather candidates to remove in row and column
+	for(i = 0; i < n;i++){
+		
+		numX = board[i][pos->y]->checked;
+		numY = board[pos->x][i]->checked;
+		numBlock = board[blockPos->x + (i % n)][blockPos->y + ((int) (i/n))]->checked;
+		// check in row
+		if(numX)
+			removables[numX] = numX;
+		
+		// check in column
+		if(numY)
+			removables[numY] = numY;
+		
+		// check in block
+		if(numBlock)
+			removables[numBlock] = numBlock;
+	}
+	
+	removeCandidates(pos->candidates, removables, n);
+}
+
+void removeCandidates(int* a1, int* a2, int n){
+	for(int i = 0; i < n; i++){
+		if(a2[i])
+			a1[i] = i+1;
+	}
+
+}
+
+void uniqueCanditate() {
+	// FIXME
+	
+	return;
+}
+//****************Might not be needed**********************
+void lineRemoval() {
+	// FIXME
+	
+	return;
+}
+
+
+void blockRemoval() {
+	// FIXME
+	
+	return;
+}
+
+
+void nakedSubset() {
+	// FIXME
+	
+	return;
+}
+
+
+void hiddenSubset() {
+	// FIXME
+	
+	return;
+}
+
+
+void xWing() {
+	// FIXME
+	
+	return;
+}
+
+
+void swordfish() {
+	// FIXME
+	
+	return;
+}
