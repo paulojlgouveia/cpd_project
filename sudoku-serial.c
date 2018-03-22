@@ -27,13 +27,12 @@ typedef struct {
 	int checked;
 } position;
 
-position* Position(int size, int x, int y) {
-	position *p = malloc(sizeof(position));
+void Position(position *p, int size, int x, int y) {
+// 	position *p = malloc(sizeof(position));
 	p->candidates = malloc(size * sizeof(int));
 	p->x = x;
 	p->y = y;
-	p-> checked = 0;
-	return p;
+	p->checked = 0;
 }
 
 
@@ -46,10 +45,10 @@ int charToInt(char c) {
 	return c - '0';
 }
 
-void printBoard(position ***board, int N) {
+void printBoard(position **board, int N) {
 	for (int i = 0; i < N; i++) {
 		for (int j = 0; j < N; j++) {
-			printf("%d ", board[i][j]->candidates[0]);
+			printf("%d ", board[i][j].candidates[0]);
 		}
 		printf("\n");
 	}
@@ -188,7 +187,7 @@ int main(int argc, char *argv[]) {
 	FILE *file;
 	int l, n;
 	int value;
-	position*** board;
+	position** board;
 	char line[MAX_LINE_SIZE];
 	char* cell;
 	
@@ -220,14 +219,15 @@ int main(int argc, char *argv[]) {
 		
 		
 		
-		board = (position***) malloc(n * sizeof(position**));
+		board = (position**) malloc(n * sizeof(position*));
 		for (int i = 0; i < n; i++) {
-			board[i] = (position**) malloc(n * sizeof(position*));
+			board[i] = (position*) malloc(n * sizeof(position));
 			for (int j = 0; j < n; j++) {
-				board[i][j] = Position(n, i, j);
+				Position(&board[i][j], n, i, j);
 			}
 		}
-		
+			printBoard(board, n);
+
 		
 		// initialize the board
 		for (int i = 0; i < n ; i++) {
@@ -238,13 +238,14 @@ int main(int argc, char *argv[]) {
 					value = charToInt(*cell);
 						
 					if (value > 0) {
-						board[i][j]->checked = value;
-						printf("FUUUUCK\n");
+						board[i][j].checked = value;
+						
 					} else {
 						for (int t = 1; 1 <= n; t++)
-							board[i][j]->candidates[t-1] = t;
+							board[i][j].candidates[t-1] = t;
 					}
 					
+						printf("%d %d\n", board[0][0].x, board[0][0].y);
 					cell = strtok(NULL, " ");
 				}
 				
@@ -276,7 +277,7 @@ int main(int argc, char *argv[]) {
 	// free the memory
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < n; j++) {
-			free(board[i][j]);
+			free(board[i][j].candidates);
 		}
 		free(board[i]);
 	}     
