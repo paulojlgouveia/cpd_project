@@ -36,9 +36,10 @@ void Position(position *p, int size, int x, int y) {
 }
 
 void printCell(position* p, int size) {
-	char* checked = (p->checked == 0)? "True " : "False";
+// 	char* checked = (p->checked == 0)? "True " : "False";
+// 	printf("(%d,%d) %s [", p->x, p->y, checked);
 	
-	printf("(%d,%d) %s [", p->x, p->y, checked);
+	printf("(%d,%d) %d [", p->x, p->y, p->checked);
 	for (int t = 0; t < size; t++)
 		printf(" %d", p->candidates[t]);
 	
@@ -94,11 +95,10 @@ position getBlockTopLeft(position blockPosition, int l){
 
 int validatePosition(position p, int test){ return (p.x < 0 || p.x >= test || p.y < 0 || p.y >= test);}
 
-int solved(int ***board, int N) {
-	// FIXME
+int solved(position **board, int N) {
 	for (int i = 0; i < N; i++)
 		for (int j = 0; j < N; j++)
-			if (board[i][j][0] == 0)
+			if (board[i][j].checked == 0)
 				return 0;
 			
 	return 1;
@@ -266,9 +266,12 @@ int main(int argc, char *argv[]) {
 	// <scrapbook>
 
 	// </scrapbook>
+	
 
 	// display solution
 	printBoard(board, n);
+// 	char* s = (solved(board, n) != 0)? "True " : "False";
+// 	printf("%s\n", s);
 	
 	// free the memory
 	for (int i = 0; i < n; i++) {
