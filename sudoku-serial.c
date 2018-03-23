@@ -233,13 +233,17 @@ void removeCandidates(int* a1, int* a2, int n){
 		if(a2[i])
 			a1[i] = i+1;
 	}
-
 }
 
-void uniqueCanditate() {
-	// FIXME
-	
-	return;
+void uniqueCanditate(position *pos, int n) {
+	int count = 0, unique;
+	for(int i  = 0; i < n; i++){
+		unique = pos->candidates[i];
+		if(unique)
+			count++;
+	}
+	if(count == 1)
+		pos->checked = unique;
 }
 //****************Might not be needed**********************
 void lineRemoval() {
