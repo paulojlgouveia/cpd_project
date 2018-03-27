@@ -4,7 +4,7 @@ FLAGS=-fopenmp -ansi -pedantic -Wall -Wno-unused-result -O3 -lm -std=c99
 out=""
 
 
-all: compile test
+all: compile run
 
 compile: clean serial omp mpi
 

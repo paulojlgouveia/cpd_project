@@ -1,0 +1,452 @@
+
+	
+/************************************************************************
+ * 																		*
+ * Parallel and Distributed Computing 									*
+ * project part 1														*
+ * 																		*
+ * group 4, Alameda														*
+ * 																		*
+ * 75657 Paulo Gouveia													*
+ * 76213 Gonçalo Lopes													*
+ * ##### ## ##															*
+ * 																		*
+ * Serial implementation												*
+ * 																		*
+ ************************************************************************/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// 9 spaces, 16 cells (2 digits), '\n', '\0', possible '\r'
+unsigned int MAX_LINE_SIZE = 44; 
+
+
+/***********************************************************************************/
+
+typedef struct {
+	int x, y;
+} position;
+
+typedef struct {
+	int x, y;
+	int value;
+	int *candidates;
+} cell;
+
+// typedef struct {
+// 	cell *cells;
+// } set;
+
+
+/***********************************************************************************/
+
+
+cell* EmptyCell(int candidatesSize, int x, int y);
+cell* Cell(int value, int x, int y);
+cell** Set(int size);
+cell*** Board(int size);
+
+void freeCell(cell* cell);
+void freeSet(cell** set);
+void freeBoard(cell*** board, int size);
+
+void printCell(cell* cell, int candidatesSize);
+void printSet(cell** set, int size);
+void printBoard(cell*** board, int size);
+
+int validCell(int x, int y, int bounds);
+int contains(cell** set, int value, int bounds);
+int uniqueCanditate(cell* cell, int size);
+int solved(cell*** board, int size);
+
+cell* getCell(cell*** board, int x, int y, int size);
+void rowToSet(cell** set, cell*** board, int x, int y, int width);
+void columnToSet(cell** set, cell*** board, int x, int y, int hight);
+void blockToSet(cell** set, cell*** board, int x, int y, int width);
+
+void removeCandidateFromSet(int value, cell** set, int size);
+void resolveCandidates(cell** row, cell** column, cell** block, int size);
+
+
+/***********************************************************************************/
+
+
+int main(int argc, char *argv[]) {
+	
+	FILE *file;
+	int L, N;
+	int value;
+	cell ***board;
+	cell **row, **column, **block;
+	char line[MAX_LINE_SIZE];
+	char* inputCell;
+	
+	if(argc < 2){
+		printf("missing argument.\nusage: sudoku-serial <filename>\n");
+		exit(1);
+	}
+	
+	// read initial board from the input file
+	file = fopen(argv[1], "r");
+	if (file == NULL) {	
+		printf("failed to read input file: '%s'\n", argv[1]);
+		exit(2);
+	 
+	} else {
+		// read first line (board size)
+		fgets(line, MAX_LINE_SIZE, file);
+		sscanf(line,"%d", &L);
+		N = L * L;
+		
+		// initialize the board
+		board = Board(N);
+		for (int i = 0; i < N ; i++) {
+			if (fgets(line, MAX_LINE_SIZE, file) != NULL) {
+				inputCell = strtok(line, " ");
+				for (int j = 0; j < N; j++) {
+					value = atoi(inputCell);
+					if (value > 0)
+						board[i][j] = Cell(value, i, j);
+					else
+						board[i][j] = EmptyCell(N, i, j);
+					
+					inputCell = strtok(NULL, " ");
+				}
+				
+			} else {
+				printf("ill formed file '%s'\n", argv[1]);
+				exit(3);
+			}
+		}
+		
+	    fclose(file);
+	}
+	
+	
+	// <FIXME> solve the thing here
+	
+	row = Set(N);
+	column = Set(N);
+	block = Set(N);
+	int values[N];
+	int selected = 0;
+	
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++) {
+			if (!board[i][j]->value) {
+				rowToSet(row, board, i, j, N);
+				columnToSet(column, board, i, j, N);
+				blockToSet(block, board, i, j, L);
+				
+				for (int t = 1; t < N+1; t++) {
+					if ((contains(row, t, N) || contains(column, t, N) || contains(block, t, N))) {
+						values[t-1] = 0;
+						
+					} else {
+						values[t-1] = t;
+					}
+				}
+				
+				for (int t = 0; t < N; t++) {
+					board[i][j]->candidates[t] = values[t];
+				}
+				
+				if ((selected = uniqueCanditate(board[i][j], N)) != 0) {
+					removeCandidateFromSet(selected, row, N);
+					removeCandidateFromSet(selected, column, N);
+					removeCandidateFromSet(selected, block, N);
+				}
+				
+			}
+		}
+	}
+	
+	
+// 	printCell(board[0][0], N);
+	
+	
+	
+// 	while (!solved(board, N)) {
+// 		
+// 	}
+	
+	// </FIXME>
+		
+	
+	
+	// display solution
+	printBoard(board, N);
+// 	char* s = (solved(board, n) != 0)? "True " : "False";
+// 	printf("%s\n", s);
+	
+	
+	
+// 	printf("\nrow example for (1,2):\n");
+// 	rowToSet(set, board, 1, 2, n);
+// 	printSet(set, n);	
+// 	
+// 	printf("\ncolumn example for (1,2):\n");
+// 	columnToSet(set, board, 1, 2, n);
+// 	printSet(set, n);	
+// 	
+// 	printf("\nblock example for (1,2):\n");
+// 	blockToSet(set, board, 1, 2, l);
+// 	printSet(set, n);
+	
+	
+	freeBoard(board, N);
+// 	freeSet(set);
+	
+	return 0;
+}
+
+/***********************************************************************************/
+
+cell* EmptyCell(int candidatesSize, int x, int y) {
+	cell* cell = malloc(sizeof(cell));
+	cell->x = x;
+	cell->y = y;
+	cell->candidates = malloc(candidatesSize * sizeof(int));
+	cell->value = 0;
+	
+	return cell;
+}
+
+cell* Cell(int value, int x, int y) {
+	cell* cell = malloc(sizeof(cell));
+	cell->x = x;
+	cell->y = y;
+	cell->candidates = NULL;
+	cell->value = value;
+	
+	return cell;
+}
+
+cell** Set(int size) {
+	return malloc(size * sizeof(cell*));
+}
+
+cell*** Board(int size) {
+	cell*** board = (cell***) malloc(size * sizeof(cell**));
+	for (int i = 0; i < size; i++) 
+		board[i] = (cell**) malloc(size * sizeof(cell*));
+	
+	return board;
+}
+
+// cell*** getBoardFromFile(char *inputFile) {
+// 	FILE *file;
+// 	cell ***board;
+// 	
+// 	// read initial board from the input file
+// 	file = fopen(inputFile, "r");
+// 	if (file == NULL) {	
+// 		printf("failed to read input file: '%s'\n", inputFile);
+// 		exit(2);
+// 	 
+// 	} else {
+// 		// read first line (board size)
+// 		fgets(line, MAX_LINE_SIZE, file);
+// 		sscanf(line,"%d", &L);
+// 		N = L * L;
+// 		
+// 		// initialize the board
+// 		board = Board(N);
+// 		for (int i = 0; i < N ; i++) {
+// 			if (fgets(line, MAX_LINE_SIZE, file) != NULL) {
+// 				inputCell = strtok(line, " ");
+// 				for (int j = 0; j < N; j++) {
+// 					value = atoi(inputCell);
+// 					if (value > 0)
+// 						board[i][j] = Cell(value, i, j);
+// 					else
+// 						board[i][j] = EmptyCell(N, i, j);
+// 					
+// 					inputCell = strtok(NULL, " ");
+// 				}
+// 				
+// 			} else {
+// 				printf("ill formed file '%s'\n", inputFile);
+// 				exit(3);
+// 			}
+// 		}
+// 		
+// 	    fclose(file);
+// 	}
+// 	
+// 	return board;
+// }
+
+
+/***********************************************************************************/
+
+void freeCell(cell* cell) {
+	if (cell->candidates != NULL)
+		free(cell->candidates);
+	
+	free(cell);
+}
+
+void freeSet(cell** set) {
+	free(set);
+}
+
+void freeBoard(cell*** board, int size) {
+	for (int i = 0; i < size; i++) {
+		for (int j = 0; j < size; j++) {
+			freeCell(board[i][j]);
+		}
+		
+		free(board[i]);
+	}   
+	
+	free(board);
+}
+
+
+/***********************************************************************************/
+
+void printCell(cell* cell, int candidatesSize) {
+// 	char* checked = (p->checked == 0)? "True " : "False";
+// 	printf("(%d,%d) %s [", p->x, p->y, checked);
+	
+	printf("(%d,%d) %d [", cell->x, cell->y, cell->value+1);
+	
+	if (cell->candidates != NULL)
+		for (int t = 0; t < candidatesSize; t++)
+			printf(" %d", cell->candidates[t]);
+	
+	printf(" ]\n");
+}
+
+void printSet(cell** set, int size) {
+	for (int t = 0; t < size; t++)
+		printCell(set[t], size);
+	
+// 	printf("\n");
+}
+
+void printBoard(cell*** board, int size) {
+	
+	if (size > 9) {
+		for (int i = 0; i < size; i++) {
+			for (int j = 0; j < size; j++) {
+				printf("%2d ", board[i][j]->value);
+			}
+			printf("\n");
+		}
+		
+	} else {
+		for (int i = 0; i < size; i++) {
+			for (int j = 0; j < size; j++) {
+				printf("%d ", board[i][j]->value);
+			}
+			printf("\n");
+		}
+	}
+// 	printf("\n");
+}
+
+
+/***********************************************************************************/
+
+int validCell(int x, int y, int bounds) {
+	return !(x < 0 || x >= bounds || y < 0 || y >= bounds);
+}
+
+int contains(cell** set, int value, int bounds) {
+	for (int t = 0; t < bounds; t++) {
+		if (set[t]->value == value)
+			return 1;
+	}
+	
+	return 0;
+}
+
+int uniqueCanditate(cell* cell, int size) {
+	int value = 0;
+	// returns on second candidate found instead of looping over all
+	for (int t = 0; t < size; t++) {	
+		if (cell->candidates[t] != 0) {
+			if (value != 0)
+				return 0;
+			else
+				value = cell->candidates[t];
+		}
+	}
+	
+	// if unique, update cell and return != than 0
+	cell->value = value;
+// 	removeCandidateFromSet(selected, set, N);
+	return value;
+}
+
+int solved(cell*** board, int size) {
+	for (int i = size-1; i > -1; i--)
+		for (int j = size-1; j > -1; j--)
+			if (board[i][j]->value == 0)
+				return 0;
+			
+	return 1;
+}
+
+
+/***********************************************************************************/
+
+cell* getCell(cell*** board, int x, int y, int size) {
+	if (validCell(x, y, size))
+		return board[x][y];
+	else
+		return NULL;
+}
+
+void rowToSet(cell** set, cell*** board, int x, int y, int width) {
+	for (int t = 0; t < width; t++)
+		set[t] = board[x][t];
+}
+
+void columnToSet(cell** set, cell*** board, int x, int y, int hight) {
+	for (int t = 0; t < hight; t++)
+		set[t] = board[t][y];
+}
+
+void blockToSet(cell** set, cell*** board, int x, int y, int width) {
+	int xStart =  width * (int) (x / width);
+	int xEnd   = xStart + width;
+	int yStart = width * (int) (y / width);
+	int yEnd   = yStart + width;
+	
+	int t = 0;
+	for (int i = xStart; i < xEnd; i++) {
+		for (int j = yStart; j < yEnd; j++) {
+			set[t] = board[i][j];
+			t++;
+		}
+	}
+}
+
+
+/***********************************************************************************/
+
+void removeCandidateFromSet(int value, cell** set, int size) {
+	for (int t = 0; t < size; t++) {	
+		if (set[t]->value == 0) {
+			set[t]->candidates[value-1] = 0;
+			uniqueCanditate(set[t], size);
+		}
+	}
+	
+}
+
+void resolveCandidates(cell** row, cell** column, cell** block, int size) {
+	
+	for (int t = 0; t < size; t++) {
+		
+	}
+}
+
+
+
+

@@ -36,6 +36,12 @@ do
 		outputed=${expected//'expected/'/'output/'}
 		name=${expected//'expected/'/''}
 		
+		
+		if [ ${#name} -le 8 ]; then
+			name="${name}    "
+		fi
+		
+		
 		#ignore blank spaces at the end of line
 		diff -Z ${expected} ${outputed} > /dev/null
 		
