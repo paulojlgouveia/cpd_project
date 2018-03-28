@@ -1,19 +1,19 @@
 
 	
-/************************************************************************
-* 																		*
-* Parallel and Distributed Computing 									*
-* project part 1														*
-* 																		*
-* group 4, Alameda														*
-* 																		*
-* 75657 Paulo Gouveia													*
-* 76213 Gonçalo Lopes													*
-* ##### ## ##															*
-* 																		*
-* Serial implementation												*
-* 																		*
-************************************************************************/
+/****************************************************************************
+* 																			*
+* Parallel and Distributed Computing 										*
+* project part 1															*
+* 																			*
+* group 4, Alameda															*
+* 																			*
+* 75657 Paulo Gouveia														*
+* 76213 Gonçalo Lopes														*
+* ##### ## ##																*
+* 																			*
+* OpenMP implementation														*
+* 																			*
+*****************************************************************************/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,17 +21,25 @@
 
 // 9 spaces, 16 cells (2 digits), '\n', '\0', possible '\r'
 #define MAX_LINE_SIZE 44
+// 16^3
 #define MAX_STACK_SIZE 4096
 
 
-/***********************************************************************************/
+/******************************************************************************/
 
-typedef struct puzzle puzzle;
-typedef struct stack stack;
-typedef struct element element;
+typedef struct puzzle {
+	int L, N;
+	int **table;
+} puzzle;
+
+typedef struct element {
+	int x, y;
+	int value;
+	int expanded;
+} element;
 
 
-void push(stack stack, element* element);
+/******************************************************************************/
 
 puzzle* Puzzle(int modSize);
 puzzle* getPuzzleFromFile(char *inputFile);
@@ -46,7 +54,7 @@ int recursiveSolve(puzzle* board, int row, int column);
 int iterativeSolve(puzzle* board);
 
 
-/***********************************************************************************/
+/******************************************************************************/
 
 int main(int argc, char *argv[]) {
 
@@ -75,35 +83,8 @@ int main(int argc, char *argv[]) {
 }
 
 
-/***********************************************************************************/
 
-
-struct puzzle {
-	int L, N;
-	int **table;
-};
-
-struct element {
-	int x, y;
-	int value;
-	int visited;
-// 	element* next;
-};
-
-struct stack {
-	element* first;
-	element* last;
-};
-
-
-/***********************************************************************************/
-
-// void push(stack stack, element* element) {
-// 	
-// }
-
-
-/***********************************************************************************/
+/******************************************************************************/
 
 puzzle* Puzzle(int modSize) {
 	puzzle* board = malloc(sizeof(puzzle));
@@ -170,7 +151,7 @@ void freePuzzle(puzzle *board) {
 }
 
 
-/***********************************************************************************/
+/******************************************************************************/
 
 void printBoard(puzzle *board) {
 	
@@ -194,9 +175,9 @@ void printBoard(puzzle *board) {
 }
 
 
-/***********************************************************************************/
+/******************************************************************************/
 
-int valid(puzzle* board, int row, int column, int number) {
+int isValid(puzzle* board, int row, int column, int number) {
 		
     int rowStart = (row/board->L) * board->L;
     int colStart = (column/board->L) * board->L;
@@ -223,12 +204,12 @@ int solved(puzzle* board) {
 		for (int j = board->N-1; j > -1; j--)
 			if (board->table[i][j] == 0)
 				return 0;
-			
+		
 	return 1;
 }
 
 
-/***********************************************************************************/
+/******************************************************************************/
 
 int recursiveSolve(puzzle* board, int row, int column) {
 	
@@ -247,7 +228,7 @@ int recursiveSolve(puzzle* board, int row, int column) {
 			
 		} else {
 			for(int i = 0; i < board->N; ++i) {
-				if (valid(board, row, column, i+1)) {
+				if (isValid(board, row, column, i+1)) {
 					board->table[row][column] = i+1;
 					if (column+1 < board->N) {
 						if (recursiveSolve(board, row, column+1))
@@ -275,19 +256,9 @@ int recursiveSolve(puzzle* board, int row, int column) {
 	}
 }
 
-
-
-// 	push(stack, &stackPtr, i, j, value)
-// element* push(element* stack, int* stackPtr, int x, int y, int value) {
-// 	stackPtr++;
-// 	stack[stackPtr].x = i;
-// 	stack[stackPtr].y = i;
-// 	stack[stackPtr].value = value;
-// }
-
 int iterativeSolve(puzzle* board) {
-
-	element stack[board->N * board->N * board->N];
+// 	element stack[board->N * board->N * board->N];
+	element stack[MAX_STACK_SIZE];
 	int stackPtr = -1;
 	int progress = 0;
 	
@@ -298,12 +269,12 @@ int iterativeSolve(puzzle* board) {
 			if (!board->table[i][j]) {
 				for (int value = board->N; value > 0; value--) {
 					// add candidates to stack
-					if (valid(board, i, j, value)) {
+					if (isValid(board, i, j, value)) {
 						stackPtr++;
 						stack[stackPtr].x = i;
 						stack[stackPtr].y = j;
 						stack[stackPtr].value = value;
-						stack[stackPtr].visited = 0;
+						stack[stackPtr].expanded = 0;
 						
 						progress = 1;
 					}
@@ -311,7 +282,7 @@ int iterativeSolve(puzzle* board) {
 				
 				// if no candidates added, revert last changes
 				if (!progress) {
-					while (stack[stackPtr].visited) {
+					while (stack[stackPtr].expanded) {
 						i = stack[stackPtr].x;
 						j = stack[stackPtr].y;
 						board->table[i][j] = 0;
@@ -319,35 +290,18 @@ int iterativeSolve(puzzle* board) {
 					}
 				}
 				
-				// pick a candidate for the next iteration
-				i = stack[stackPtr].x;
-				j = stack[stackPtr].y;
-				board->table[i][j] = stack[stackPtr].value;
-				stack[stackPtr].visited = 1;
-				
-// 				if (progress) {
-// 				// pick a candidate for the next iteration
-// 					i = stack[stackPtr].x;
-// 					j = stack[stackPtr].y;
-// 					board->table[i][j] = stack[stackPtr].value;
-// 					stack[stackPtr].visited = 1;
-// 					
-// 				} else {
-// 				// if no candidates added, revert last change
-// 					while (stack[stackPtr].visited) {
-// 						i = stack[stackPtr].x;
-// 						j = stack[stackPtr].y;
-// 						board->table[i][j] = 0;
-// 						stackPtr--;
-// 					}
-// 					
-// 					i = stack[stackPtr].x;
-// 					j = stack[stackPtr].y;
-// 					board->table[i][j] = stack[stackPtr].value;
-// 					stack[stackPtr].visited = 1;
-// 				}
-				
-				progress = 0;
+				if (stackPtr >= 0) {
+					// pick a candidate for the next iteration
+					i = stack[stackPtr].x;
+					j = stack[stackPtr].y;
+					board->table[i][j] = stack[stackPtr].value;
+					stack[stackPtr].expanded = 1;
+					
+					progress = 0;
+					
+				} else {
+					return 0;
+				}
 			}
 		}
 	}
