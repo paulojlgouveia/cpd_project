@@ -15,12 +15,13 @@ INPUTS=$(find input/*.in)
 
 for bin in ${BINARIES}
 do
+start=`date +%s`
 	for input in ${INPUTS}
 	do
 		output=${input//'input/'/'output/'}
 		output=${output//'.in'/'.out'}
 		
-		$(./sudoku-serial ${input} > ${output})
+		$(./${bin} ${input} > ${output})
 	done
 	
 	
@@ -57,6 +58,9 @@ do
 		fi
 			
 	done
+	
+	end=`date +%s`
+	runtime=$((end-start))
 	
 	echo -e "${bold}${italic}${bin} : ${correct}/${total} tests.${end}\n"
 done

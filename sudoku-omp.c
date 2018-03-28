@@ -1,110 +1,317 @@
+
 	
 /************************************************************************
- * 																		*
- * Parallel and Distributed Computing 									*
- * project part 1														*
- * 																		*
- * group 4, Alameda														*
- * 																		*
- * 75657 Paulo Gouveia													*
- * ##### ## ##															*
- * ##### ## ##															*
- * 																		*
- * OpenMP implementation												*
- * 																		*
- ************************************************************************/
+* 																		*
+* Parallel and Distributed Computing 									*
+* project part 1														*
+* 																		*
+* group 4, Alameda														*
+* 																		*
+* 75657 Paulo Gouveia													*
+* 76213 Gonçalo Lopes													*
+* ##### ## ##															*
+* 																		*
+* Serial implementation												*
+* 																		*
+************************************************************************/
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-// 8 spaces, 9 cells, '\n', possible '\r' on windows
-unsigned int MAX_LINE_SIZE = 19; 
+#include<omp.h>
 
-int charToInt(char c) {
-	return c - '0';
-}
+// 9 spaces, 16 cells (2 digits), '\n', '\0', possible '\r'
+#define MAX_LINE_SIZE 44
+#define MAX_STACK_SIZE 44
 
-void printBoard(int **board, int N) {
-	
-	for (int i = 0; i < N; i++) {
-		for (int j = 0; j < N; j++) {
-			printf("%d ", board[i][j]);
-		}
-		printf("\n");
-	}
-	
-// 	printf("\n");
-}
 
+/***********************************************************************************/
+
+typedef struct puzzle puzzle;
+typedef struct stack stack;
+typedef struct element element;
+
+
+void push(stack stack, element* element);
+
+puzzle* Puzzle(int modSize);
+puzzle* getPuzzleFromFile(char *inputFile);
+void freePuzzle(puzzle *board);
+
+void printBoard(puzzle *board);
+
+int valid(puzzle* board, int row, int column, int number);
+
+int recursiveSolve(puzzle* board, int row, int column);
+int iterativeSolve(puzzle* board);
+
+
+/***********************************************************************************/
 
 int main(int argc, char *argv[]) {
-	
-	FILE *file;
-	int l, n;
-	int** board;
-	char line[MAX_LINE_SIZE];
-	char* cell;
+
+	puzzle *board;
 	
 	if(argc < 2){
 		printf("missing argument.\nusage: sudoku-serial <filename>\n");
 		exit(1);
 	}
 	
-	// read initial board from the input file
-	file = fopen(argv[1], "r");
-	if (file == NULL) {	
-		printf("failed to read input file: '%s'\n", argv[1]);
-		exit(2);
-	 
+	board = getPuzzleFromFile(argv[1]);
+	
+	
+	
+	if (recursiveSolve(board, 0, 0)) {
+		printBoard(board);
+		
 	} else {
-		// read first line (board size)
-		fgets(line, MAX_LINE_SIZE, file);
-		sscanf(line,"%d", &l);
-		n = l * l;
-// 		printf("l = %d, n = %d\n", l, n);
-		
-		board = (int**) malloc(n * sizeof(int*));
-		for (int t = 0; t < n; t++) {
-			board[t] = (int*) malloc(n * sizeof(int));	
-		}
-		
-		// initialize the board
-		for (int i = 0; i < n ; i++) {
-			if (fgets(line, MAX_LINE_SIZE, file) != NULL) {
-				
-				cell = strtok(line, " ");
-				for (int j = 0; j < n; j++) {
-					board[i][j] = charToInt(*cell);
-					cell = strtok(NULL, " ");
-				}
-				
-			} else {
-				printf("ill formed file '%s'\n", argv[1]);
-				exit(3);
-			}
-		}
-		
-	    fclose(file);
+		printf("No solution.\n");
 	}
 	
 	
-	// FIXME
-	// solve the thing here
-	// FIXME
-	
-	
-	// display solution
-	printBoard(board, n);
-	
-	// free the memory
-	for (int t = 0; t < n; t++) {
-		free(board[t]);  
-	}     
-	free(board);
-
+	freePuzzle(board);
 	
 	return 0;
 }
 
-// int charToInt(char c) { return c - '0'; }
+
+/***********************************************************************************/
+
+
+struct puzzle {
+	int L, N;
+	int **table;
+};
+
+struct element {
+	int x, y;
+	int value;
+	element* next;
+};
+
+struct stack {
+	element* first;
+	element* last;
+};
+
+
+/***********************************************************************************/
+
+void push(stack stack, element* element) {
+	
+}
+
+
+/***********************************************************************************/
+
+puzzle* Puzzle(int modSize) {
+	puzzle* board = malloc(sizeof(puzzle));
+	
+	board->L = modSize;
+	board->N = modSize * modSize;
+	
+	board->table = (int**) malloc(board->N * sizeof(int*));
+	for (int i = 0; i < board->N; i++) 
+		board->table[i] = (int*) malloc(board->N * sizeof(int));
+	
+	return board;
+}
+
+puzzle* getPuzzleFromFile(char *inputFile) {
+	
+	FILE *file;
+	int modSize;
+	char line[MAX_LINE_SIZE];
+	char* inputCell;
+	
+	puzzle* board;
+	
+	// read initial board from the input file
+	file = fopen(inputFile, "r");
+	if (file == NULL) {	
+		printf("failed to read input file: '%s'\n", inputFile);
+		exit(2);
+	
+	} else {
+		// read first line (board size)
+		fgets(line, MAX_LINE_SIZE, file);
+		sscanf(line,"%d", &modSize);
+		
+		// initialize the board
+		board = Puzzle(modSize);
+		
+		for (int i = 0; i < board->N; i++) {
+			if (fgets(line, MAX_LINE_SIZE, file) != NULL) {
+				inputCell = strtok(line, " ");
+				for (int j = 0; j < board->N; j++) {
+					board->table[i][j] = atoi(inputCell);					
+					inputCell = strtok(NULL, " ");
+				}
+				
+			} else {
+				printf("ill formed file '%s'\n", inputFile);
+				exit(3);
+			}
+		}
+		
+		fclose(file);
+	}
+	
+	return board;
+}
+
+void freePuzzle(puzzle *board) {
+	for (int i = 0; i < board->N; i++) {
+		free(board->table[i]);
+	}  
+	
+	free(board);
+}
+
+
+/***********************************************************************************/
+
+void printBoard(puzzle *board) {
+	
+	if (board->N > 9) {
+		for (int i = 0; i < board->N; i++) {
+			for (int j = 0; j < board->N; j++) {
+				printf("%2d ", board->table[i][j]);
+			}
+			printf("\n");
+		}
+		
+	} else {
+		for (int i = 0; i < board->N; i++) {
+			for (int j = 0; j < board->N; j++) {
+				printf("%d ", board->table[i][j]);
+			}
+			printf("\n");
+		}
+	}
+// 	printf("\n");
+}
+
+
+/***********************************************************************************/
+
+int valid(puzzle* board, int row, int column, int number) {
+		
+    int rowStart = (row/board->L) * board->L;
+    int colStart = (column/board->L) * board->L;
+
+    for(int i = 0; i < board->N; ++i) {
+        if (board->table[row][i] == number)
+			return 0;
+		
+        if (board->table[i][column] == number)
+			return 0;
+		
+		int iFromBlock = rowStart + (i % board->L);
+		int jFromBlock = colStart + (i / board->L);
+		
+        if (board->table[iFromBlock][jFromBlock] == number)
+			return 0;
+    }
+    
+    return 1;
+}
+
+
+/***********************************************************************************/
+
+int recursiveSolve(puzzle* board, int row, int column) {
+	
+	// if not reached the end of the board
+	if (row < board->N && column < board->N) {
+		
+		if (board->table[row][column]) {
+			if (column+1 < board->N) {
+				return recursiveSolve(board, row, column+1);
+				
+			} else if (row+1 < board->N) {
+				return recursiveSolve(board, row+1, 0);
+				
+			} else
+				return 1;
+			
+		} else {
+			for(int i = 0; i < board->N; ++i) {
+				if (valid(board, row, column, i+1)) {
+					board->table[row][column] = i+1;
+					if (column+1 < board->N) {
+						if (recursiveSolve(board, row, column+1))
+							return 1;
+						else
+							board->table[row][column] = 0;
+						
+					} else if (row+1 < board->N) {
+						if (recursiveSolve(board, row+1, 0))
+							return 1;
+						else
+							board->table[row][column] = 0;
+						
+					} else {
+						return 1;
+					}
+				}
+			}
+		}
+		
+		return 0;
+		
+	} else {
+		return 1;
+	}
+}
+
+
+int iterativeSolve(puzzle* board) {
+	
+	
+// 	// if not reached the end of the board
+// 	if (row < board->N && column < board->N) {
+// 		
+// 		if (board->table[row][column] != 0) {
+// 			if (column+1 < board->N) {
+// 				return solve(board, row, column+1);
+// 				
+// 			} else if (row+1 < board->N) {
+// 				return solve(board, row+1, 0);
+// 				
+// 			} else
+// 				return 1;
+// 			
+// 		} else {
+// 			for(int i = 0; i < board->N; ++i) {
+// 				if (valid(board, row, column, i+1)) {
+// 					board->table[row][column] = i+1;
+// 					if (column+1 < board->N) {
+// 						if (solve(board, row, column+1))
+// 							return 1;
+// 						else
+// 							board->table[row][column] = 0;
+// 						
+// 					} else if (row+1 < board->N) {
+// 						if (solve(board, row+1, 0))
+// 							return 1;
+// 						else
+// 							board->table[row][column] = 0;
+// 						
+// 					} else {
+// 						return 1;
+// 					}
+// 				}
+// 			}
+// 		}
+// 		
+// 		return 0;
+// 		
+// 	} else {
+// 		return 1;
+// 	}
+	
+	return 0;
+}
+

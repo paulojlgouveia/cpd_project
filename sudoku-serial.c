@@ -20,22 +20,86 @@
 #include <string.h>
 
 // 9 spaces, 16 cells (2 digits), '\n', '\0', possible '\r'
-unsigned int MAX_LINE_SIZE = 44; 
+#define MAX_LINE_SIZE 44
+#define MAX_STACK_SIZE 44
 
 
 /***********************************************************************************/
 
-typedef struct {
-	int fixed;
-	int value;
-// 	int *candidates;
-} cell;
+typedef struct puzzle puzzle;
+typedef struct stack stack;
+typedef struct element element;
 
 
-typedef struct {
+void push(stack stack, element* element);
+
+puzzle* Puzzle(int modSize);
+puzzle* getPuzzleFromFile(char *inputFile);
+void freePuzzle(puzzle *board);
+
+void printBoard(puzzle *board);
+
+int valid(puzzle* board, int row, int column, int number);
+int solved(puzzle* board);
+
+int recursiveSolve(puzzle* board, int row, int column);
+int iterativeSolve(puzzle* board);
+
+
+/***********************************************************************************/
+
+int main(int argc, char *argv[]) {
+
+	puzzle *board;
+	
+	if(argc < 2){
+		printf("missing argument.\nusage: sudoku-serial <filename>\n");
+		exit(1);
+	}
+	
+	board = getPuzzleFromFile(argv[1]);
+	
+	
+// 	if (recursiveSolve(board, 0, 0)) {
+	if (iterativeSolve(board)) {
+		printBoard(board);
+		
+	} else {
+		printf("No solution.\n");
+	}
+	
+	
+	freePuzzle(board);
+	
+	return 0;
+}
+
+
+/***********************************************************************************/
+
+
+struct puzzle {
 	int L, N;
 	int **table;
-} puzzle;
+};
+
+struct element {
+	int x, y;
+	int value;
+// 	element* next;
+};
+
+struct stack {
+	element* first;
+	element* last;
+};
+
+
+/***********************************************************************************/
+
+// void push(stack stack, element* element) {
+// 	
+// }
 
 
 /***********************************************************************************/
@@ -49,6 +113,49 @@ puzzle* Puzzle(int modSize) {
 	board->table = (int**) malloc(board->N * sizeof(int*));
 	for (int i = 0; i < board->N; i++) 
 		board->table[i] = (int*) malloc(board->N * sizeof(int));
+	
+	return board;
+}
+
+puzzle* getPuzzleFromFile(char *inputFile) {
+	
+	FILE *file;
+	int modSize;
+	char line[MAX_LINE_SIZE];
+	char* inputCell;
+	
+	puzzle* board;
+	
+	// read initial board from the input file
+	file = fopen(inputFile, "r");
+	if (file == NULL) {	
+		printf("failed to read input file: '%s'\n", inputFile);
+		exit(2);
+	
+	} else {
+		// read first line (board size)
+		fgets(line, MAX_LINE_SIZE, file);
+		sscanf(line,"%d", &modSize);
+		
+		// initialize the board
+		board = Puzzle(modSize);
+		
+		for (int i = 0; i < board->N; i++) {
+			if (fgets(line, MAX_LINE_SIZE, file) != NULL) {
+				inputCell = strtok(line, " ");
+				for (int j = 0; j < board->N; j++) {
+					board->table[i][j] = atoi(inputCell);					
+					inputCell = strtok(NULL, " ");
+				}
+				
+			} else {
+				printf("ill formed file '%s'\n", inputFile);
+				exit(3);
+			}
+		}
+		
+		fclose(file);
+	}
 	
 	return board;
 }
@@ -100,23 +207,39 @@ int valid(puzzle* board, int row, int column, int number) {
         if (board->table[i][column] == number)
 			return 0;
 		
-        if (board->table[rowStart + (i%board->L)][colStart + (i/board->L)] == number)
+		int iFromBlock = rowStart + (i % board->L);
+		int jFromBlock = colStart + (i / board->L);
+		
+        if (board->table[iFromBlock][jFromBlock] == number)
 			return 0;
     }
     
     return 1;
 }
 
+int solved(puzzle* board) {
+	for (int i = board->N-1; i > -1; i--)
+		for (int j = board->N-1; j > -1; j--)
+			if (board->table[i][j] == 0)
+				return 0;
+			
+	return 1;
+}
 
-int solve(puzzle* board, int row, int column) {
+
+/***********************************************************************************/
+
+int recursiveSolve(puzzle* board, int row, int column) {
 	
+	// if not reached the end of the board
 	if (row < board->N && column < board->N) {
-		if (board->table[row][column] != 0) {
+		
+		if (board->table[row][column]) {
 			if (column+1 < board->N) {
-				return solve(board, row, column+1);
+				return recursiveSolve(board, row, column+1);
 				
 			} else if (row+1 < board->N) {
-				return solve(board, row+1, 0);
+				return recursiveSolve(board, row+1, 0);
 				
 			} else
 				return 1;
@@ -126,13 +249,13 @@ int solve(puzzle* board, int row, int column) {
 				if (valid(board, row, column, i+1)) {
 					board->table[row][column] = i+1;
 					if (column+1 < board->N) {
-						if (solve(board, row, column+1))
+						if (recursiveSolve(board, row, column+1))
 							return 1;
 						else
 							board->table[row][column] = 0;
 						
-					} else if((row+1)<board->N) {
-						if (solve(board, row+1, 0))
+					} else if (row+1 < board->N) {
+						if (recursiveSolve(board, row+1, 0))
 							return 1;
 						else
 							board->table[row][column] = 0;
@@ -153,71 +276,78 @@ int solve(puzzle* board, int row, int column) {
 
 
 
-/***********************************************************************************/
+// 	push(stack, &stackPtr, i, j, value)
+// element* push(element* stack, int* stackPtr, int x, int y, int value) {
+// 	stackPtr++;
+// 	stack[stackPtr].x = i;
+// 	stack[stackPtr].y = i;
+// 	stack[stackPtr].value = value;
+// }
 
+int iterativeSolve(puzzle* board) {
+	
+	printBoard(board);
+	printf("\n");
 
-int main(int argc, char *argv[]) {
-	
-	FILE *file;
-	int modSize;
-	puzzle *board;
-	char line[MAX_LINE_SIZE];
-	char* inputCell;
-	
-	if(argc < 2){
-		printf("missing argument.\nusage: sudoku-serial <filename>\n");
-		exit(1);
-	}
-	
-	// read initial board from the input file
-	file = fopen(argv[1], "r");
-	if (file == NULL) {	
-		printf("failed to read input file: '%s'\n", argv[1]);
-		exit(2);
-	
-	} else {
-		// read first line (board size)
-		fgets(line, MAX_LINE_SIZE, file);
-		sscanf(line,"%d", &modSize);
+	element stack[board->N * board->N * board->N];
+	int stackPtr = -1;
+	int progress = 0;
 		
-		// initialize the board
-		board = Puzzle(modSize);
-		
+// 	int i = 0, j = 0;
+// 	while (!solved(board) && i < board->N && j < board->N) {
+// 	while (!solved(board)) {
 		for (int i = 0; i < board->N; i++) {
-			if (fgets(line, MAX_LINE_SIZE, file) != NULL) {
-				inputCell = strtok(line, " ");
-				for (int j = 0; j < board->N; j++) {
-					board->table[i][j] = atoi(inputCell);					
-					inputCell = strtok(NULL, " ");
-				}
+			for (int j = 0; j < board->N; j++) {
 				
-			} else {
-				printf("ill formed file '%s'\n", argv[1]);
-				exit(3);
+				if (!board->table[i][j]) {
+					for (int value = board->N; value > 0; value--) {
+						if (valid(board, i, j, value)) {
+							stackPtr++;
+							stack[stackPtr].x = i;
+							stack[stackPtr].y = j;
+							stack[stackPtr].value = value;
+							
+							progress = 1;
+// 							printf(">> (%d,%d) %d \n", i, j, value);
+						}
+					}
+				}
+					
+					if (!progress) {
+// 						i = stack[stackPtr].x;
+// 						j = stack[stackPtr].y;
+						board->table[i][j] = 0;
+						stackPtr--;
+						
+
+						
+					} 
+// 					else {
+						i = stack[stackPtr].x;
+						j = stack[stackPtr].y;
+						board->table[i][j] = stack[stackPtr].value;
+						progress = 0;
+						
+// 						printf("<< (%d,%d) %d \n\n", i, j, board->table[i][j]);
+						
+	// 						printBoard(board);
+	// 						printf("\n");
+						
+// 							getchar();
+// 					}
+					
+// 				} else {
+// // 					stack[stackPtr].x = i;
+// // 					stack[stackPtr].y = j;
+// // 					stack[stackPtr].value = board->table[i][j];
+// // 					stackPtr++;
+// 				}
 			}
 		}
-		
-		fclose(file);
-	}
-	
+// 	}
 
 // 	printBoard(board);
-// 	printf("\n");
-	
-	if (solve(board, 0, 0)) {
-		printBoard(board);
-		
-	} else {
-		printf("No solution.\n");
-	}
-	
-	
-	freePuzzle(board);
-	
-	return 0;
+
+	return solved(board);
 }
-
-
-/***********************************************************************************/
-
 
