@@ -15,7 +15,7 @@ INPUTS=$(find input/*.in)
 
 for bin in ${BINARIES}
 do
-start=`date +%s`
+# start=`date +%s`
 	for input in ${INPUTS}
 	do
 		output=${input//'input/'/'output/'}
@@ -59,8 +59,8 @@ start=`date +%s`
 			
 	done
 	
-	end=`date +%s`
-	runtime=$((end-start))
+# 	end=`date +%s`
+# 	runtime=$((end-start))
 	
 	echo -e "${bold}${italic}${bin} : ${correct}/${total} tests.${end}\n"
 done
