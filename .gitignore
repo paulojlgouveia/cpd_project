@@ -3,6 +3,7 @@ output/*
 sudoku-serial
 sudoku-omp
 sudoku-mpi
+*.kate-swp
 
 
 # Prerequisites

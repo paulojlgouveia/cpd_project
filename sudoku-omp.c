@@ -1,5 +1,4 @@
 
-	
 /****************************************************************************
 * 																			*
 * Parallel and Distributed Computing 										*
@@ -25,7 +24,7 @@
 #define MAX_STACK_SIZE 4096
 
 
-/******************************************************************************/
+/****************************************************************************/
 
 typedef struct puzzle {
 	int L, N;
@@ -39,13 +38,15 @@ typedef struct element {
 } element;
 
 
-/******************************************************************************/
+/****************************************************************************/
 
 puzzle* Puzzle(int modSize);
 puzzle* getPuzzleFromFile(char *inputFile);
 void freePuzzle(puzzle *board);
 
+void printSolution(puzzle *board);
 void printBoard(puzzle *board);
+void printStack(element* stack, int from, int to);
 
 int valid(puzzle* board, int row, int column, int number);
 int solved(puzzle* board);
@@ -54,7 +55,7 @@ int recursiveSolve(puzzle* board, int row, int column);
 int iterativeSolve(puzzle* board);
 
 
-/******************************************************************************/
+/****************************************************************************/
 
 int main(int argc, char *argv[]) {
 
@@ -78,13 +79,11 @@ int main(int argc, char *argv[]) {
 	
 	
 	freePuzzle(board);
-	
 	return 0;
 }
 
 
-
-/******************************************************************************/
+/****************************************************************************/
 
 puzzle* Puzzle(int modSize) {
 	puzzle* board = malloc(sizeof(puzzle));
@@ -151,7 +150,16 @@ void freePuzzle(puzzle *board) {
 }
 
 
-/******************************************************************************/
+/****************************************************************************/
+
+void printSolution(puzzle *board) {
+	for (int i = 0; i < board->N; i++) {
+		for (int j = 0; j < board->N; j++) {
+			printf("%d ", board->table[i][j]);
+		}
+		printf("\n");
+	}
+}
 
 void printBoard(puzzle *board) {
 	
@@ -171,11 +179,18 @@ void printBoard(puzzle *board) {
 			printf("\n");
 		}
 	}
-// 	printf("\n");
+	printf("\n");
+}
+
+void printStack(element* stack, int from, int toInclusive) {
+	for (int t = from; t <= toInclusive; t++)
+		printf("%4d: (%d,%d) %2d\n", t, stack[t].x, stack[t].y, stack[t].value);
+	
+	printf("\n");
 }
 
 
-/******************************************************************************/
+/****************************************************************************/
 
 int isValid(puzzle* board, int row, int column, int number) {
 		
@@ -209,7 +224,7 @@ int solved(puzzle* board) {
 }
 
 
-/******************************************************************************/
+/****************************************************************************/
 
 int recursiveSolve(puzzle* board, int row, int column) {
 	
@@ -280,7 +295,10 @@ int iterativeSolve(puzzle* board) {
 					}
 				}
 				
-				// if no candidates added, revert last changes
+				printStack(stack, 0, stackPtr);
+				getchar();
+				
+				// if no candidates added, revert last branch of changes
 				if (!progress) {
 					while (stack[stackPtr].expanded) {
 						i = stack[stackPtr].x;
@@ -300,6 +318,7 @@ int iterativeSolve(puzzle* board) {
 					progress = 0;
 					
 				} else {
+					// nothing left to try, there is no solution
 					return 0;
 				}
 			}
