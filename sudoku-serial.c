@@ -8,7 +8,7 @@
 * 																			*
 * 75657 Paulo Gouveia														*
 * 76213 Gonçalo Lopes														*
-* ##### ## ##																*
+* 70969 Mario Reis															*
 * 																			*
 * Serial implementation														*
 * 																			*
@@ -295,8 +295,8 @@ int iterativeSolve(puzzle* board) {
 					}
 				}
 				
-				printStack(stack, 0, stackPtr);
-				getchar();
+// 				printStack(stack, 0, stackPtr);
+// 				getchar();
 				
 				// if no candidates added, revert last branch of changes
 				if (!progress) {
