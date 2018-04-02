@@ -20,8 +20,8 @@
 
 // 9 spaces, 16 cells (2 digits), '\n', '\0', possible '\r'
 #define MAX_LINE_SIZE 44
-// 16^3
-#define MAX_STACK_SIZE 4096
+// 81^3
+#define MAX_STACK_SIZE 531441
 
 
 /****************************************************************************/
@@ -282,6 +282,7 @@ int iterativeSolve(puzzle* board) {
 			
 			// if empty cell
 			if (!board->table[i][j]) {
+				
 				for (int value = board->N; value > 0; value--) {
 					// add candidates to stack
 					if (isValid(board, i, j, value)) {
@@ -294,9 +295,6 @@ int iterativeSolve(puzzle* board) {
 						progress = 1;
 					}
 				}
-				
-// 				printStack(stack, 0, stackPtr);
-// 				getchar();
 				
 				// if no candidates added, revert last branch of changes
 				if (!progress) {
