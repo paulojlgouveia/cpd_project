@@ -18,8 +18,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-// 9 spaces, 16 cells (2 digits), '\n', '\0', possible '\r'
-#define MAX_LINE_SIZE 44
+// 81 spaces, 162 cells (2 digits), '\n', '\0', possible '\r'
+#define MAX_LINE_SIZE 246
 // 81^2 + (81*80)/2 , board size + candidates per cell
 #define MAX_STACK_SIZE 9801
 
@@ -294,9 +294,6 @@ int iterativeSolve(puzzle* board) {
 						progress = 1;
 					}
 				}
-				
-// 				printStack(stack, 0, stackPtr);
-// 				getchar();
 				
 				// if no candidates added, revert last branch of changes
 				if (!progress) {
