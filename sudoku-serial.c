@@ -20,8 +20,8 @@
 
 // 9 spaces, 16 cells (2 digits), '\n', '\0', possible '\r'
 #define MAX_LINE_SIZE 44
-// 81^3
-#define MAX_STACK_SIZE 531441
+// 81^2 + (81*80)/2 , board size + candidates per cell
+#define MAX_STACK_SIZE 9801
 
 
 /****************************************************************************/
