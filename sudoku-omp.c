@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <omp.h>
 
 // 81 spaces, 162 cells (2 digits), '\n', '\0', possible '\r'
 #define MAX_LINE_SIZE 246
@@ -51,7 +52,6 @@ void printStack(element* stack, int from, int to);
 int valid(puzzle* board, int row, int column, int number);
 int solved(puzzle* board);
 
-int recursiveSolve(puzzle* board, int row, int column);
 int iterativeSolve(puzzle* board);
 
 
@@ -61,15 +61,15 @@ int main(int argc, char *argv[]) {
 
 	puzzle *board;
 	
-	if(argc < 2){
-		printf("missing argument.\nusage: sudoku-serial <filename>\n");
+	if(argc < 3){
+		printf("missing argument.\nusage: sudoku-serial <filename> <thread_count>\n");
 		exit(1);
 	}
 	
 	board = getPuzzleFromFile(argv[1]);
 	
+	omp_set_num_threads(atoi(argv[2]));
 	
-// 	if (recursiveSolve(board, 0, 0)) {
 	if (iterativeSolve(board)) {
 		printBoard(board);
 		
@@ -226,56 +226,19 @@ int solved(puzzle* board) {
 
 /****************************************************************************/
 
-int recursiveSolve(puzzle* board, int row, int column) {
-	
-	// if not reached the end of the board
-	if (row < board->N && column < board->N) {
-		
-		if (board->table[row][column]) {
-			if (column+1 < board->N) {
-				return recursiveSolve(board, row, column+1);
-				
-			} else if (row+1 < board->N) {
-				return recursiveSolve(board, row+1, 0);
-				
-			} else
-				return 1;
-			
-		} else {
-			for(int i = 0; i < board->N; ++i) {
-				if (isValid(board, row, column, i+1)) {
-					board->table[row][column] = i+1;
-					if (column+1 < board->N) {
-						if (recursiveSolve(board, row, column+1))
-							return 1;
-						else
-							board->table[row][column] = 0;
-						
-					} else if (row+1 < board->N) {
-						if (recursiveSolve(board, row+1, 0))
-							return 1;
-						else
-							board->table[row][column] = 0;
-						
-					} else {
-						return 1;
-					}
-				}
-			}
-		}
-		
-		return 0;
-		
-	} else {
-		return 1;
-	}
-}
-
 int iterativeSolve(puzzle* board) {
-// 	element stack[board->N * board->N * board->N];
-	element stack[MAX_STACK_SIZE];
-	int stackPtr = -1;
+	element globalStack[MAX_STACK_SIZE][MAX_STACK_SIZE];
+	int globalStackPtr = -1;
+	
+	puzzle privBoard = *board;
+	element pathStack[MAX_STACK_SIZE];
+	int pathStackPtr = -1;
 	int progress = 0;
+	
+	// FIXME copy board for each thread
+	
+#pragma omp parallel firstprivate(pathStack, pathStackPtr, progress, privBoard)
+{
 	
 	for (int i = 0; i < board->N; i++) {
 		for (int j = 0; j < board->N; j++) {
@@ -284,13 +247,13 @@ int iterativeSolve(puzzle* board) {
 			if (!board->table[i][j]) {
 				
 				for (int value = board->N; value > 0; value--) {
-					// add candidates to stack
+					// add candidates to pathStack
 					if (isValid(board, i, j, value)) {
-						stackPtr++;
-						stack[stackPtr].x = i;
-						stack[stackPtr].y = j;
-						stack[stackPtr].value = value;
-						stack[stackPtr].expanded = 0;
+						pathStackPtr++;
+						pathStack[pathStackPtr].x = i;
+						pathStack[pathStackPtr].y = j;
+						pathStack[pathStackPtr].value = value;
+						pathStack[pathStackPtr].expanded = 0;
 						
 						progress = 1;
 					}
@@ -298,30 +261,31 @@ int iterativeSolve(puzzle* board) {
 				
 				// if no candidates added, revert last branch of changes
 				if (!progress) {
-					while (stack[stackPtr].expanded) {
-						i = stack[stackPtr].x;
-						j = stack[stackPtr].y;
+					while (pathStack[pathStackPtr].expanded) {
+						i = pathStack[pathStackPtr].x;
+						j = pathStack[pathStackPtr].y;
 						board->table[i][j] = 0;
-						stackPtr--;
+						pathStackPtr--;
 					}
 				}
 				
-				if (stackPtr >= 0) {
+				if (pathStackPtr >= 0) {
 					// pick a candidate for the next iteration
-					i = stack[stackPtr].x;
-					j = stack[stackPtr].y;
-					board->table[i][j] = stack[stackPtr].value;
-					stack[stackPtr].expanded = 1;
+					i = pathStack[pathStackPtr].x;
+					j = pathStack[pathStackPtr].y;
+					board->table[i][j] = pathStack[pathStackPtr].value;
+					pathStack[pathStackPtr].expanded = 1;
 					
 					progress = 0;
 					
 				} else {
 					// nothing left to try, there is no solution
-					return 0;
+// 					return 0;
 				}
 			}
 		}
 	}
+}
 	
 	return solved(board);
 }

@@ -29,8 +29,8 @@ mpi:
 	
 	
 run: compile
-	@for f in input/*.in; do echo '\n'$$f; time ./sudoku-serial $$f; done
-# 	@for file in input/*.in; do echo $$file; ./sudoku-omp $$file; done
+# 	@for f in input/*.in; do echo '\n'$$f; time ./sudoku-serial $$f; done
+	@for f in input/*.in; do echo '\n'$$f; time ./sudoku-omp $$f 2; done
 # 	@for file in input/*.in; do echo $$file; ./sudoku-mpi $$file; done
 	@echo
 
