@@ -52,7 +52,7 @@ void printStack(element* stack, int from, int to);
 int valid(puzzle* board, int row, int column, int number);
 int solved(puzzle* board);
 
-int iterativeSolve(puzzle* board);
+int iterativeSolve(puzzle* board, int threadsN);
 
 
 /****************************************************************************/
@@ -68,9 +68,10 @@ int main(int argc, char *argv[]) {
 	
 	board = getPuzzleFromFile(argv[1]);
 	
+	omp_set_dynamic(0);
 	omp_set_num_threads(atoi(argv[2]));
 	
-	if (iterativeSolve(board)) {
+	if (iterativeSolve(board, atoi(argv[2]))) {
 		printBoard(board);
 		
 	} else {
@@ -226,69 +227,98 @@ int solved(puzzle* board) {
 
 /****************************************************************************/
 
-int iterativeSolve(puzzle* board) {
+int iterativeSolve(puzzle* board, int threadsN) {
+	
+#pragma omp single
+{
+// 	int threadsN = omp_get_num_threads();
+	
 	element globalStack[MAX_STACK_SIZE][MAX_STACK_SIZE];
 	int globalStackPtr = -1;
 	
-	puzzle privBoard = *board;
-	element pathStack[MAX_STACK_SIZE];
+	puzzle* boards[threadsN];
+	element pathStack[threadsN][MAX_STACK_SIZE];
+// 	int pathStackPtr[threadsN];
+// 	int progress[threadsN];
 	int pathStackPtr = -1;
 	int progress = 0;
 	
-	// FIXME copy board for each thread
+	int i, j, value;
 	
-#pragma omp parallel firstprivate(pathStack, pathStackPtr, progress, privBoard)
-{
 	
-	for (int i = 0; i < privBoard.N; i++) {
-		for (int j = 0; j < privBoard.N; j++) {
-			
-			// if empty cell
-			if (!privBoard.table[i][j]) {
-				
-				for (int value = privBoard.N; value > 0; value--) {
-					// add candidates to pathStack
-					if (isValid(&privBoard, i, j, value)) {
-						pathStackPtr++;
-						pathStack[pathStackPtr].x = i;
-						pathStack[pathStackPtr].y = j;
-						pathStack[pathStackPtr].value = value;
-						pathStack[pathStackPtr].expanded = 0;
-						
-						progress = 1;
-					}
-				}
-				
-				// if no candidates added, revert last branch of changes
-				if (!progress) {
-					while (pathStack[pathStackPtr].expanded) {
-						i = pathStack[pathStackPtr].x;
-						j = pathStack[pathStackPtr].y;
-						privBoard.table[i][j] = 0;
-						pathStackPtr--;
-					}
-				}
-				
-				printf("%d - %d,%d\n", omp_get_thread_num(), i, j);
-				
-				if (pathStackPtr >= 0) {
-					// pick a candidate for the next iteration
-					i = pathStack[pathStackPtr].x;
-					j = pathStack[pathStackPtr].y;
-					privBoard.table[i][j] = pathStack[pathStackPtr].value;
-					pathStack[pathStackPtr].expanded = 1;
-					
-					progress = 0;
-					
-				} else {
-					// nothing left to try, there is no solution
-// 					return 0;
-				}
-			}
-		}
+	for(int t = 0; t < threadsN; t++) {
+		boards[t] = Puzzle(board->L);
+		memcpy(boards[t], board, sizeof(puzzle));
+		memcpy(boards[t]->table, board->table, sizeof(board->N * sizeof(int*)));
+		
+		for (int i = 0; i < board->N; i++)
+			memcpy(boards[t]->table[i], board->table[i], sizeof(board->N * sizeof(int)));
+		
+// 		pathStackPtr[t] = -1;
+// 		progress[t] = 0;
+		
+		printf("- %d /%d -\n", t, threadsN);	
+		printBoard(boards[t]);
 	}
-}
 	
+	
+	
+#pragma omp parallel firstprivate(pathStackPtr, progress) private(i, j, value)
+{
+	int tid = omp_get_thread_num();
+	
+// 	for (i = 0; i < boards[tid]->N; i++) {
+// 		for (j = 0; j < boards[tid]->N; j++) {
+// 			
+// 			// if empty cell
+// 			if (!boards[tid]->table[i][j]) {
+// 				
+// 				for (value = boards[tid]->N; value > 0; value--) {
+// 					// add candidates to pathStack
+// 					if (isValid(boards[tid], i, j, value)) {
+// 						pathStackPtr++;
+// 						pathStack[tid][pathStackPtr].x = i;
+// 						pathStack[tid][pathStackPtr].y = j;
+// 						pathStack[tid][pathStackPtr].value = value;
+// 						pathStack[tid][pathStackPtr].expanded = 0;
+// 						
+// 						progress = 1;
+// 					}
+// 				}
+// 				
+// 				// if no candidates added, revert last branch of changes
+// 				if (!progress) {
+// 					while (pathStack[tid][pathStackPtr].expanded) {
+// 						i = pathStack[tid][pathStackPtr].x;
+// 						j = pathStack[tid][pathStackPtr].y;
+// 						boards[tid]->table[i][j] = 0;
+// 						pathStackPtr--;
+// 					}
+// 				}
+// 				
+// // 				printf("%d - %d,%d\n", omp_get_thread_num(), i, j);
+// 				
+// 				if (pathStackPtr >= 0) {
+// 					// pick a candidate for the next iteration
+// 					i = pathStack[tid][pathStackPtr].x;
+// 					j = pathStack[tid][pathStackPtr].y;
+// 					boards[tid]->table[i][j] = pathStack[tid][pathStackPtr].value;
+// 					pathStack[tid][pathStackPtr].expanded = 1;
+// 					
+// 					progress = 0;
+// 					
+// 				} else {
+// 					// nothing left to try, there is no solution
+// // 					return 0;
+// 				}
+// 			}
+// 		}
+// 	}
+
+// 	printf("- %d -\n", tid);	
+// 	printBoard(boards[tid]);
+}
+}
 	return solved(board);
 }
 
