@@ -193,6 +193,7 @@ void printStack(element* stack, int from, int toInclusive) {
 
 /****************************************************************************/
 
+/*
 int isValid(puzzle* board, int row, int column, int number) {
 		
     int rowStart = (row/board->L) * board->L;
@@ -214,6 +215,51 @@ int isValid(puzzle* board, int row, int column, int number) {
     
     return 1;
 }
+*/
+
+
+int isValid(puzzle* board, int row, int column, int number) {
+		
+    int rowStart = (row/board->L) * board->L;
+    int colStart = (column/board->L) * board->L;
+    int flag = 1;    	
+    int iFromBlock;
+    int jFromBlock;
+
+    #pragma omp parallel
+    for(int i = 0; i < board->N; ++i) {
+        
+        if (board->table[row][i] == number) {
+            #pragma omp critical
+            {
+                flag = 0;
+            }
+            #pragma omp cancel parallel
+        }
+        
+	if (board->table[i][column] == number) {
+            #pragma omp critical
+            {
+                flag = 0;
+            }
+            #pragma omp cancel parallel
+        }
+
+        iFromBlock = rowStart + (i % board->L);
+        jFromBlock = colStart + (i / board->L);
+        
+	if (board->table[iFromBlock][jFromBlock] == number) {
+            #pragma omp critical
+            {
+                flag = 0;
+            }
+            #pragma omp cancel parallel
+        }
+    }
+    return flag;
+}
+
+
 
 int solved(puzzle* board) {
 	for (int i = board->N-1; i > -1; i--)
