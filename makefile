@@ -41,8 +41,8 @@ test: compile
 
 
 valgrind: compile
-	valgrind -v --leak-check=full ./sudoku-serial input/ex2.in
-# 	valgrind -v --leak-check=full ./sudoku-omp input/ex2.in
+# 	valgrind -v --leak-check=full ./sudoku-serial input/ex2.in
+	valgrind -v --leak-check=full ./sudoku-omp input/ex2.in
 # 	valgrind -v --leak-check=full ./sudoku-mpi input/ex2.in
 	
 	

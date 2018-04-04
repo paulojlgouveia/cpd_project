@@ -240,15 +240,15 @@ int iterativeSolve(puzzle* board) {
 #pragma omp parallel firstprivate(pathStack, pathStackPtr, progress, privBoard)
 {
 	
-	for (int i = 0; i < board->N; i++) {
-		for (int j = 0; j < board->N; j++) {
+	for (int i = 0; i < privBoard.N; i++) {
+		for (int j = 0; j < privBoard.N; j++) {
 			
 			// if empty cell
-			if (!board->table[i][j]) {
+			if (!privBoard.table[i][j]) {
 				
-				for (int value = board->N; value > 0; value--) {
+				for (int value = privBoard.N; value > 0; value--) {
 					// add candidates to pathStack
-					if (isValid(board, i, j, value)) {
+					if (isValid(&privBoard, i, j, value)) {
 						pathStackPtr++;
 						pathStack[pathStackPtr].x = i;
 						pathStack[pathStackPtr].y = j;
@@ -264,16 +264,18 @@ int iterativeSolve(puzzle* board) {
 					while (pathStack[pathStackPtr].expanded) {
 						i = pathStack[pathStackPtr].x;
 						j = pathStack[pathStackPtr].y;
-						board->table[i][j] = 0;
+						privBoard.table[i][j] = 0;
 						pathStackPtr--;
 					}
 				}
+				
+				printf("%d - %d,%d\n", omp_get_thread_num(), i, j);
 				
 				if (pathStackPtr >= 0) {
 					// pick a candidate for the next iteration
 					i = pathStack[pathStackPtr].x;
 					j = pathStack[pathStackPtr].y;
-					board->table[i][j] = pathStack[pathStackPtr].value;
+					privBoard.table[i][j] = pathStack[pathStackPtr].value;
 					pathStack[pathStackPtr].expanded = 1;
 					
 					progress = 0;
