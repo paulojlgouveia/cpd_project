@@ -4,7 +4,7 @@ FLAGS=-fopenmp -ansi -pedantic -Wall -Wno-unused-result -O3 -lm -std=c99
 out=""
 
 
-all: compile run
+all: compile
 
 compile: clean serial omp mpi
 
@@ -43,13 +43,13 @@ test: compile
 
 
 valgrind: compile
-# 	valgrind -v --leak-check=full ./sudoku-serial input/ex2.in
+	valgrind -v --leak-check=full ./sudoku-serial input/ex2.in
 	valgrind -v --leak-check=full ./sudoku-omp input/4x4.in 4
 # 	valgrind -v --leak-check=full ./sudoku-mpi input/ex2.in
 	
 	
 submission:
-	zip omp_g04A.zip sudoku-serial.c sudoku-omp.c report-omp.pdf
+	zip omp_g04A.zip sudoku-serial.c sudoku-omp.c report-omp.pdf makefile
 	
 submission2:
 	zip mpi_g04A.zip sudoku-serial.c sudoku-mpi.c report-mpi.pdf
