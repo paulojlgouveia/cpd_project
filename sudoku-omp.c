@@ -421,15 +421,15 @@ void genNodes(element* parent) {
 
 	for(value = 1; value <= N; value++){
 		valid = isValid(table, nextPos.x, nextPos.y, value);
-		printf("%d is valid in (%d,%d)? -> %d\n",value,nextPos.x,nextPos.y,valid);
+		//printf("%d is valid in (%d,%d)? -> %d\n",value,nextPos.x,nextPos.y,valid);
 		if(valid){
 			child = Element(table, nextPos.x,nextPos.y,value);
-			printf("inserting %d from (%d,%d)\n",value,nextPos.x,nextPos.y);
+			//printf("inserting %d from (%d,%d)\n",value,nextPos.x,nextPos.y);
 			#pragma omp critical
 			{
 				pushElement(child);				
 			}
-			printf("inserted\n");
+			//printf("inserted\n");
 			//printStack();
 		}
 	}
@@ -463,42 +463,42 @@ int iterativeSolve(puzzle* board, int nthreads) {
 
 		while(!terminated){
 			//printf("size=%d\n",size);
-			printf("\n****Thread(%d) vvv****\n",tid);
+			//printf("\n****Thread(%d) vvv****\n",tid);
 
-			printStack();
+			//printStack();
 			#pragma omp critical
 			{
-				printf("\n--Thread(%d) popping!!\n",tid);
+				//printf("\n--Thread(%d) popping!!\n",tid);
 				current = popElement();
-				if(current != NULL)
-					printf("*****sCurrent(%d): %d in (%d,%d)\n", tid ,current->value,current->x,current->y);
+				/*if(current != NULL)
+					//printf("*****sCurrent(%d): %d in (%d,%d)\n", tid ,current->value,current->x,current->y);
 				else{
-					printf("Current(%d): NULL :(\n", tid);
-				}
+					//printf("Current(%d): NULL :(\n", tid);
+				}*/
 			}
 			
 			//printf("?");
 			//getchar();
 			if(current != NULL){
-				printf("Current(%d): %d in (%d,%d)\n", tid, current->value,current->x,current->y);
+				//printf("Current(%d): %d in (%d,%d)\n", tid, current->value,current->x,current->y);
 			//	printBoard(current->table);
 				genNodes(current);
 				
-				printf("stillAlive\n");
+				//printf("stillAlive\n");
 				if(solved(current->table)){
-					printf("finishing!(%d)\n",tid);
+					//printf("finishing!(%d)\n",tid);
 					terminated = 1;
 					hasSolution = 1;
 					for(int i= 0;i < N;i++)
 						for(int j = 0;j < N; j++)
 							solution[i][j] = current->table[i][j];
 				}
-				printf("YESYES\n");
+				//printf("YESYES\n");
 				freeElement(current);
 				//printf("NONO\n");
 			}
 			else{
-				printf("\n--Thread(%d) is here!!\n",tid);
+				//printf("\n--Thread(%d) is here!!\n",tid);
 				top = head;				
 				while(top == NULL && sumStucks < nthreads && !terminated){
 					//printf("i'm stuck hhere (%d)\n",tid);
@@ -508,19 +508,20 @@ int iterativeSolve(puzzle* board, int nthreads) {
 						sumStucks += stucks[t];
 					}
 					top = head;				
-					printf("???\n");
+					//printf("???\n");
+					#pragma omp flush
 
 				}
 				for(int t = 0; t < nthreads; t++) {
 					stucks[t] = 0;
 				}
 				if(sumStucks == nthreads){
-					printf("ITS OVER! sum =%d\n",sumStucks);
+					//printf("ITS OVER! sum =%d\n",sumStucks);
 					hasSolution = 0;
 					terminated = 1;
 				}
-				if(terminated)
-					printf("BAILED!(%d)\n",tid);
+				//if(terminated)
+					//printf("BAILED!(%d)\n",tid);
 			}
 		}
 	}
