@@ -33,10 +33,11 @@ typedef struct puzzle {
 } puzzle;
 
 typedef struct element {
-	struct element* parent;
 	int x, y;
 	int value;
-	int expanded, openChilds;
+	int expanded;
+	struct element *parent;
+	struct element *nextSibling, *nextChild;
 } element;
 // typedef struct Element element;
 
@@ -45,14 +46,17 @@ typedef struct element {
 element* newElement(element* parent, int x, int y, int value) {
 	element* new = malloc(sizeof(element));
 	new->parent = parent;
+	
 	new->x = x;
 	new->y = y;
 	new->value = value;
-	new->expanded = 0;
-	new->openChilds = 0;
 	
-// 	if (parent != NULL)
-// 		parent->openChilds++;
+	new->expanded = 0;
+	new->nextChild = NULL;
+	if (parent != NULL) {
+		new->nextSibling = parent->nextChild;
+		parent->nextChild = new;
+	}
 	
 	return new;
 }
@@ -239,7 +243,7 @@ int iterativeSolve(puzzle* board, int threadsN) {
 	
 	int added = 0;
 	element *queue[board->N];
-	element *parent = NULL, *child = NULL;
+	element *parent = NULL, *child = NULL, *aux = NULL;
 
 	
 	// find and expand first node
@@ -314,7 +318,7 @@ private(queue, xBlockStart, xBlock, yBlockStart, yBlock, value, isValid, added)
 	
 	
 	// input was not already solved
-	while(!solved) {
+	while(i < board->N && !solved) {
 		solvedByMe = 1;
 		
 		// get unexplored node from stack
@@ -344,7 +348,7 @@ private(queue, xBlockStart, xBlock, yBlockStart, yBlock, value, isValid, added)
 		privBoard[i][j] = parent->value;
 		
 		
-// 		printf("%d (%d,%d) %d  -->%d\n", tid, i, j, privBoard[i][j], stackPtr);
+		printf("%d (%d,%d) %d  -->%d\n", tid, i, j, value, stackPtr);
 		
 		
 		
@@ -355,7 +359,7 @@ private(queue, xBlockStart, xBlock, yBlockStart, yBlock, value, isValid, added)
 			if (j >= board->N) {
 				i++; j = 0;
 			}
-		} while(privBoard[i][j] && i < board->N);
+		} while(privBoard[i][j]);
 		
 		
 		// did not reach the end of the board
@@ -425,7 +429,6 @@ private(queue, xBlockStart, xBlock, yBlockStart, yBlock, value, isValid, added)
 					}
 			
 			if (solvedByMe) {
-				printf("> %d < solved.\n", tid);
 				#pragma omp critical(solved)
 				solved = 1;
 			}
@@ -448,7 +451,7 @@ private(queue, xBlockStart, xBlock, yBlockStart, yBlock, value, isValid, added)
 // 		}
 // 		printf("\n");
 // 	}
-// 	#pragma omp barrier
+	#pragma omp barrier
 	
 	
 // 	// check all positions filled
@@ -466,7 +469,7 @@ private(queue, xBlockStart, xBlock, yBlockStart, yBlock, value, isValid, added)
 				for (j = 0; j < board->N; j++)
 					board->table[i][j] = privBoard[i][j];
 			
-// 			solved = 1;
+			solved = 1;
 		}
 		omp_unset_lock(&openStackLock);
 		#pragma omp cancel parallel
