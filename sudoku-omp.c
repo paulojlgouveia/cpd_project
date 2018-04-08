@@ -1,4 +1,3 @@
-
 /****************************************************************************
 * 																			*
 * Parallel and Distributed Computing 										*
@@ -32,35 +31,53 @@ typedef struct puzzle {
 	int **table;
 } puzzle;
 
+typedef struct simple{
+	int x, y;
+} simple;
+
 typedef struct element {
 	int x, y;
 	int value;
 	int expanded;
+	int **table;
+	struct element* next;
 } element;
 
+element* head = NULL;
+element* tail = NULL;
+int** solution = NULL;
+int N, L, size = 0;
 
 /****************************************************************************/
 
 puzzle* Puzzle(int modSize);
+element* Element(int** table, int x, int y, int value);
+simple Simple(int x, int y);
 puzzle* getPuzzleFromFile(char *inputFile);
 void freePuzzle(puzzle *board);
+void freeStack();
 
-void printSolution(puzzle *board);
-void printBoard(puzzle *board);
-void printStack(element* stack, int from, int to);
+void printSolution(int** table);
+void printBoard(int** table);
+void printStack();
 
-int valid(puzzle* board, int row, int column, int number);
-int solved(puzzle* board);
+int isValid(int** table, int row, int column, int number);
+int solved(int** table);
 
-int iterativeSolve(puzzle* board, int threadsN);
+void initializeStack(int** table);
+void pushElement(element* el);
+element* popElement();
+simple getNextElement(int** table, int x, int y);
+void genNodes(element* parent);
 
+int iterativeSolve(puzzle* board, int nthreads);
 
 /****************************************************************************/
 
 int main(int argc, char *argv[]) {
 
 	puzzle *board;
-	
+	double time;
 	if(argc < 3){
 		printf("missing argument.\nusage: sudoku-serial <filename> <thread_count>\n");
 		exit(1);
@@ -70,15 +87,20 @@ int main(int argc, char *argv[]) {
 	
 	omp_set_dynamic(0);
 	omp_set_num_threads(atoi(argv[2]));
-	
+	solution = (int**) malloc(N * sizeof(int*));
+	for (int i = 0; i < board->N; i++) 
+		solution[i] = (int*) malloc(N * sizeof(int));
+
+	time = omp_get_wtime();
 	if (iterativeSolve(board, atoi(argv[2]))) {
-		printBoard(board);
+		printBoard(solution);
 		
 	} else {
 		printf("No solution.\n");
 	}
+	time = omp_get_wtime() -time;
 	
-	
+	printf("Time: %f seconds\n",time);
 	freePuzzle(board);
 	return 0;
 }
@@ -97,6 +119,35 @@ puzzle* Puzzle(int modSize) {
 		board->table[i] = (int*) malloc(board->N * sizeof(int));
 	
 	return board;
+}
+
+element* Element(int** table, int x, int y, int value) {
+	element* el = (element*) malloc(sizeof(element));
+
+	el->x = x;
+	el->y = y;
+	el->value = value;
+	el->expanded = 0;
+	
+	el->table = (int**) malloc(N * sizeof(int*));
+	for (int i = 0; i < N; i++) {
+		el->table[i] = (int*) malloc(N * sizeof(int));
+		for(int j = 0; j < N;j++){
+			el->table[i][j] = table[i][j];
+		}
+	}
+
+	el->table[x][y] = value;
+	el->next = NULL;
+	return el;
+}
+
+simple Simple(int x, int y) {
+	simple s;
+	s.x = x;
+	s.y = y;
+
+	return s;
 }
 
 puzzle* getPuzzleFromFile(char *inputFile) {
@@ -118,6 +169,8 @@ puzzle* getPuzzleFromFile(char *inputFile) {
 		// read first line (board size)
 		fgets(line, MAX_LINE_SIZE, file);
 		sscanf(line,"%d", &modSize);
+		N = modSize * modSize;
+		L = modSize;
 		
 		// initialize the board
 		board = Puzzle(modSize);
@@ -146,36 +199,57 @@ void freePuzzle(puzzle *board) {
 	for (int i = 0; i < board->N; i++) {
 		free(board->table[i]);
 	}  
-	
+	free(board->table);
 	free(board);
 }
+
+void freeElement(element* el) {
+	for (int i = 0; i < N; i++) {
+		free(el->table[i]);
+	}  
+	free(el->table);
+	free(el);
+}
+
+void freeStack(){
+	element* curr = head, *aux;
+	printStack();
+	while(curr != NULL){
+		//printf("curr %d on (%d,%d)\n",curr->value,curr->x,curr->y);
+		aux = curr;
+		curr = curr->next;
+		freeElement(aux);
+
+	}
+}
+
 
 
 /****************************************************************************/
 
-void printSolution(puzzle *board) {
-	for (int i = 0; i < board->N; i++) {
-		for (int j = 0; j < board->N; j++) {
-			printf("%d ", board->table[i][j]);
+void printSolution(int** table) {
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N; j++) {
+			printf("%d ", table[i][j]);
 		}
 		printf("\n");
 	}
 }
 
-void printBoard(puzzle *board) {
+void printBoard(int** table) {
 	
-	if (board->N > 9) {
-		for (int i = 0; i < board->N; i++) {
-			for (int j = 0; j < board->N; j++) {
-				printf("%2d ", board->table[i][j]);
+	if (N > 9) {
+		for (int i = 0; i < N; i++) {
+			for (int j = 0; j < N; j++) {
+				printf("%2d ", table[i][j]);
 			}
 			printf("\n");
 		}
 		
 	} else {
-		for (int i = 0; i < board->N; i++) {
-			for (int j = 0; j < board->N; j++) {
-				printf("%d ", board->table[i][j]);
+		for (int i = 0; i < N; i++) {
+			for (int j = 0; j < N; j++) {
+				printf("%d ", table[i][j]);
 			}
 			printf("\n");
 		}
@@ -183,41 +257,331 @@ void printBoard(puzzle *board) {
 	printf("\n");
 }
 
-void printStack(element* stack, int from, int toInclusive) {
-	for (int t = from; t <= toInclusive; t++)
-		printf("%4d: (%d,%d) %2d\n", t, stack[t].x, stack[t].y, stack[t].value);
+void printStack() {
+	element* curr = head;
+	int t = 0;
+	printf("stack start\n");
+	while(curr != NULL){
+		printf("%4d: (%d,%d) %2d\n", t, curr->x, curr->y, curr->value);
+		curr = curr->next;
+		t++;
+	}
 	
-	printf("\n");
+	printf("stack end\n");
 }
 
 
 /****************************************************************************/
 
-/*
-int isValid(puzzle* board, int row, int column, int number) {
-		
-    int rowStart = (row/board->L) * board->L;
-    int colStart = (column/board->L) * board->L;
 
-    for(int i = 0; i < board->N; ++i) {
-        if (board->table[row][i] == number)
+int isValid(int** table, int x, int y, int number) {
+		
+    int rowStart = (x/L) * L;
+    int colStart = (y/L) * L;
+    for(int i = 0; i < N; ++i) {
+        if (table[x][i] == number)
 			return 0;
 		
-        if (board->table[i][column] == number)
+        if (table[i][y] == number)
 			return 0;
 		
-		int iFromBlock = rowStart + (i % board->L);
-		int jFromBlock = colStart + (i / board->L);
+		int iFromBlock = rowStart + (i % L);
+		int jFromBlock = colStart + (i / L);
 		
-        if (board->table[iFromBlock][jFromBlock] == number)
+        if (table[iFromBlock][jFromBlock] == number)
 			return 0;
     }
     
     return 1;
 }
-*/
+
+int solved(int** table) {
+	for (int i = N-1; i > -1; i--)
+		for (int j = N-1; j > -1; j--)
+			if (table[i][j] == 0)
+				return 0;
+		
+	return 1;
+}
 
 
+/****************************************************************************/
+
+void initializeStack(int** table) {
+	int value, valid;
+	simple firstPos;
+	element* child;
+
+	firstPos = Simple(-1,-1);
+	for(int i = 0; i < N; i++){
+		for(int j = 0; j < N; j++){
+			if(!table[i][j]){
+				//printf("first empty: (%d,%d)\n",i, j);
+				firstPos = Simple(i, j);
+				i = j = N;
+				break;
+			}
+		}
+	}
+	if(firstPos.x == -1){
+		return;
+	}
+
+	for(value = 1; value <= N; value++){
+		valid = isValid(table, firstPos.x, firstPos.y, value);
+		//printf("%d is valid in (%d,%d)? -> %d\n",value,next->x,next->y,valid);
+		if(valid){
+			child = Element(table, firstPos.x,firstPos.y,value);
+			//printf("inserting %d from (%d,%d)\n",value,meganext->x,meganext->y);
+			#pragma omp critical
+			{
+				pushElement(child);				
+			}
+			//printf("inserted\n");
+			//printStack();
+		}
+	}
+}
+
+void pushElement(element* el) {
+	if(head == NULL){
+		head = el;
+		tail = el;
+	}
+	else{
+		el->next = head;
+		head = el;
+	}
+	size++;
+}
+
+element* popElement() {
+	element* aux = NULL;
+	if(head != NULL){
+		aux = head;
+		head = head->next;
+		if(head == NULL)
+			tail = NULL;
+	}
+	size--;
+	return aux;
+}
+
+simple getNextElement(int** table, int x, int y) {
+	int i, j;
+	simple next = Simple(-1,-1);
+
+	if(y == N -1 && x == N -1)
+		return next;
+	else if (y == N -1 && x < N -1){
+		i = x  + 1;
+		j = 0;
+	}
+	else{
+		i = x;
+		j = y + 1;
+	}
+	for(;i < N; i++){
+		for(; j < N; j++){
+			//printf("isempty?: (%d,%d)\n",i, j);
+			if(!table[i][j]){
+				//printf("first empty: (%d,%d)\n",i, j);
+				next = Simple(i, j);
+				i = j = N;
+				break;
+			}
+		}
+		j= 0;
+	}
+	//printf("previous: (%d,%d)\n\n",x,y);
+	//printf("next: (%d,%d)\n",next->x,next->y);
+	return next;
+}
+
+void genNodes(element* parent) {
+	int value,valid;
+	int** table;
+	int x, y;
+
+	simple nextPos;
+	element* child;
+
+	if(parent == NULL){
+		return;
+	}
+
+	x = parent->x;
+	y = parent->y;
+	table=parent->table;
+	nextPos = getNextElement(table,x,y);
+
+	if(nextPos.x == -1){
+		return;
+	}
+
+	for(value = 1; value <= N; value++){
+		valid = isValid(table, nextPos.x, nextPos.y, value);
+		printf("%d is valid in (%d,%d)? -> %d\n",value,nextPos.x,nextPos.y,valid);
+		if(valid){
+			child = Element(table, nextPos.x,nextPos.y,value);
+			printf("inserting %d from (%d,%d)\n",value,nextPos.x,nextPos.y);
+			#pragma omp critical
+			{
+				pushElement(child);				
+			}
+			printf("inserted\n");
+			//printStack();
+		}
+	}
+	//printf("im gonna free %d from (%d,%d)\n",next->value,next->x,next->y);
+	//printStack();
+	//printStack();
+	//printf("what?\n");
+}
+
+/****************************************************************************/
+
+int iterativeSolve(puzzle* board, int nthreads) {
+	int hasSolution = 0, terminated = 0, sumStucks = 0;
+	element* top;
+
+	int stucks[nthreads];
+	element* current = NULL;
+
+	/*Initialize nthreads boards, one for each thread to work on*/
+	for(int t=0;t<nthreads;t++){
+ 		stucks[t] = 0;
+	}
+
+	/*Initialize the stack with the first node*/
+	initializeStack(board->table);
+	
+	//printStack();
+	#pragma omp parallel default(shared) private(current,top) firstprivate(sumStucks)
+	{
+		int tid = omp_get_thread_num();
+
+		while(!terminated){
+			//printf("size=%d\n",size);
+			printf("\n****Thread(%d) vvv****\n",tid);
+
+			printStack();
+			#pragma omp critical
+			{
+				printf("\n--Thread(%d) popping!!\n",tid);
+				current = popElement();
+				if(current != NULL)
+					printf("*****sCurrent(%d): %d in (%d,%d)\n", tid ,current->value,current->x,current->y);
+				else{
+					printf("Current(%d): NULL :(\n", tid);
+				}
+			}
+			
+			//printf("?");
+			//getchar();
+			if(current != NULL){
+				printf("Current(%d): %d in (%d,%d)\n", tid, current->value,current->x,current->y);
+			//	printBoard(current->table);
+				genNodes(current);
+				
+				printf("stillAlive\n");
+				if(solved(current->table)){
+					printf("finishing!(%d)\n",tid);
+					terminated = 1;
+					hasSolution = 1;
+					for(int i= 0;i < N;i++)
+						for(int j = 0;j < N; j++)
+							solution[i][j] = current->table[i][j];
+				}
+				printf("YESYES\n");
+				freeElement(current);
+				//printf("NONO\n");
+			}
+			else{
+				printf("\n--Thread(%d) is here!!\n",tid);
+				top = head;				
+				while(top == NULL && sumStucks < nthreads && !terminated){
+					//printf("i'm stuck hhere (%d)\n",tid);
+					stucks[tid] = 1;
+					sumStucks = 0;
+					for(int t = 0; t < nthreads; t++) {
+						sumStucks += stucks[t];
+					}
+					top = head;				
+					printf("???\n");
+
+				}
+				for(int t = 0; t < nthreads; t++) {
+					stucks[t] = 0;
+				}
+				if(sumStucks == nthreads){
+					printf("ITS OVER! sum =%d\n",sumStucks);
+					hasSolution = 0;
+					terminated = 1;
+				}
+				if(terminated)
+					printf("BAILED!(%d)\n",tid);
+			}
+		}
+	}
+	/*printf("IS IT HERE?\n");
+	freeStack();
+	printf("NO\n");*/
+	return hasSolution;
+}
+
+// 	element stack[board->N * board->N * board->N];
+	/*element stack[MAX_STACK_SIZE];
+	int stackPtr = -1;
+	int progress = 0;
+	#pragma omp parallel for
+	for (int i = 0; i < board->N; i++) {
+		for (int j = 0; j < board->N; j++) {
+			
+			// if empty cell
+			if (!board->table[i][j]) {
+				for (int value = board->N; value > 0; value--) {
+					// add candidates to stack
+					if (isValid(board, i, j, value)) {
+						stackPtr++;
+						stack[stackPtr].x = i;
+						stack[stackPtr].y = j;
+						stack[stackPtr].value = value;
+						stack[stackPtr].expanded = 0;
+						
+						progress = 1;
+					}
+				}
+				
+				// if no candidates added, revert last branch of changes
+				if (!progress) {
+					while (stack[stackPtr].expanded) {
+						i = stack[stackPtr].x;
+						j = stack[stackPtr].y;
+						board->table[i][j] = 0;
+						stackPtr--;
+					}
+				}
+				
+				if (stackPtr >= 0) {
+					// pick a candidate for the next iteration
+					i = stack[stackPtr].x;
+					j = stack[stackPtr].y;
+					board->table[i][j] = stack[stackPtr].value;
+					stack[stackPtr].expanded = 1;
+					
+					progress = 0;
+					
+				} else {
+					// nothing left to try, there is no solution
+				}
+			}
+		}
+	}
+	
+	return solved(board);*/
+
+/*
 int isValid(puzzle* board, int row, int column, int number) {
 		
     int rowStart = (row/board->L) * board->L;
@@ -257,114 +621,4 @@ int isValid(puzzle* board, int row, int column, int number) {
         }
     }
     return flag;
-}
-
-
-
-int solved(puzzle* board) {
-	for (int i = board->N-1; i > -1; i--)
-		for (int j = board->N-1; j > -1; j--)
-			if (board->table[i][j] == 0)
-				return 0;
-		
-	return 1;
-}
-
-
-/****************************************************************************/
-
-int iterativeSolve(puzzle* board, int threadsN) {
-	
-#pragma omp single
-{
-// 	int threadsN = omp_get_num_threads();
-	
-	element globalStack[MAX_STACK_SIZE][MAX_STACK_SIZE];
-	int globalStackPtr = -1;
-	
-	puzzle* boards[threadsN];
-	element pathStack[threadsN][MAX_STACK_SIZE];
-// 	int pathStackPtr[threadsN];
-// 	int progress[threadsN];
-	int pathStackPtr = -1;
-	int progress = 0;
-	
-	int i, j, value;
-	
-	
-	for(int t = 0; t < threadsN; t++) {
-		boards[t] = Puzzle(board->L);
-		memcpy(boards[t], board, sizeof(puzzle));
-		memcpy(boards[t]->table, board->table, sizeof(board->N * sizeof(int*)));
-		
-		for (int i = 0; i < board->N; i++)
-			memcpy(boards[t]->table[i], board->table[i], sizeof(board->N * sizeof(int)));
-		
-// 		pathStackPtr[t] = -1;
-// 		progress[t] = 0;
-		
-		printf("- %d /%d -\n", t, threadsN);	
-		printBoard(boards[t]);
-	}
-	
-	
-	
-#pragma omp parallel firstprivate(pathStackPtr, progress) private(i, j, value)
-{
-	int tid = omp_get_thread_num();
-	
-// 	for (i = 0; i < boards[tid]->N; i++) {
-// 		for (j = 0; j < boards[tid]->N; j++) {
-// 			
-// 			// if empty cell
-// 			if (!boards[tid]->table[i][j]) {
-// 				
-// 				for (value = boards[tid]->N; value > 0; value--) {
-// 					// add candidates to pathStack
-// 					if (isValid(boards[tid], i, j, value)) {
-// 						pathStackPtr++;
-// 						pathStack[tid][pathStackPtr].x = i;
-// 						pathStack[tid][pathStackPtr].y = j;
-// 						pathStack[tid][pathStackPtr].value = value;
-// 						pathStack[tid][pathStackPtr].expanded = 0;
-// 						
-// 						progress = 1;
-// 					}
-// 				}
-// 				
-// 				// if no candidates added, revert last branch of changes
-// 				if (!progress) {
-// 					while (pathStack[tid][pathStackPtr].expanded) {
-// 						i = pathStack[tid][pathStackPtr].x;
-// 						j = pathStack[tid][pathStackPtr].y;
-// 						boards[tid]->table[i][j] = 0;
-// 						pathStackPtr--;
-// 					}
-// 				}
-// 				
-// // 				printf("%d - %d,%d\n", omp_get_thread_num(), i, j);
-// 				
-// 				if (pathStackPtr >= 0) {
-// 					// pick a candidate for the next iteration
-// 					i = pathStack[tid][pathStackPtr].x;
-// 					j = pathStack[tid][pathStackPtr].y;
-// 					boards[tid]->table[i][j] = pathStack[tid][pathStackPtr].value;
-// 					pathStack[tid][pathStackPtr].expanded = 1;
-// 					
-// 					progress = 0;
-// 					
-// 				} else {
-// 					// nothing left to try, there is no solution
-// // 					return 0;
-// 				}
-// 			}
-// 		}
-// 	}
-
-// 	printf("- %d -\n", tid);	
-// 	printBoard(boards[tid]);
-}
-}
-	return solved(board);
-}
-
+}*/
