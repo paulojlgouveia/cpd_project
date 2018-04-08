@@ -29,8 +29,10 @@ mpi:
 	
 	
 run: compile
-# 	@for f in input/*.in; do echo '\n'$$f; time ./sudoku-serial $$f; done
-	@for f in input/*.in; do echo '\n'$$f; time ./sudoku-omp $$f 4; done
+	@echo 'serial'; for f in input/*.in; do echo '\n'$$f; time ./sudoku-serial $$f; done
+	@echo 'omp_2'; for f in input/*.in; do echo '\n'$$f; time ./sudoku-omp $$f 2; done
+	@echo 'omp_4'; for f in input/*.in; do echo '\n'$$f; time ./sudoku-omp $$f 4; done
+	@echo 'omp_8'; for f in input/*.in; do echo '\n'$$f; time ./sudoku-omp $$f 8; done
 # 	@for file in input/*.in; do echo $$file; ./sudoku-mpi $$file; done
 	@echo
 
@@ -42,7 +44,7 @@ test: compile
 
 valgrind: compile
 # 	valgrind -v --leak-check=full ./sudoku-serial input/ex2.in
-	valgrind -v --leak-check=full ./sudoku-omp input/ex2.in
+	valgrind -v --leak-check=full ./sudoku-omp input/4x4.in 4
 # 	valgrind -v --leak-check=full ./sudoku-mpi input/ex2.in
 	
 	

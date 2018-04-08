@@ -215,7 +215,6 @@ void freeStack(){
 	element* curr = head, *aux;
 	printStack();
 	while(curr != NULL){
-		//printf("curr %d on (%d,%d)\n",curr->value,curr->x,curr->y);
 		aux = curr;
 		curr = curr->next;
 		freeElement(aux);
@@ -316,7 +315,6 @@ void initializeStack(int** table) {
 	for(int i = 0; i < N; i++){
 		for(int j = 0; j < N; j++){
 			if(!table[i][j]){
-				//printf("first empty: (%d,%d)\n",i, j);
 				firstPos = Simple(i, j);
 				i = j = N;
 				break;
@@ -329,16 +327,12 @@ void initializeStack(int** table) {
 
 	for(value = 1; value <= N; value++){
 		valid = isValid(table, firstPos.x, firstPos.y, value);
-		//printf("%d is valid in (%d,%d)? -> %d\n",value,next->x,next->y,valid);
 		if(valid){
 			child = Element(table, firstPos.x,firstPos.y,value);
-			//printf("inserting %d from (%d,%d)\n",value,meganext->x,meganext->y);
 			#pragma omp critical
 			{
 				pushElement(child);				
 			}
-			//printf("inserted\n");
-			//printStack();
 		}
 	}
 }
@@ -371,21 +365,21 @@ simple getNextElement(int** table, int x, int y) {
 	int i, j;
 	simple next = Simple(-1,-1);
 
-	if(y == N -1 && x == N -1)
+	if(y == N -1 && x == N -1) {
 		return next;
-	else if (y == N -1 && x < N -1){
+		
+	} else if (y == N -1 && x < N -1) {
 		i = x  + 1;
 		j = 0;
-	}
-	else{
+		
+	} else {
 		i = x;
 		j = y + 1;
 	}
-	for(;i < N; i++){
-		for(; j < N; j++){
-			//printf("isempty?: (%d,%d)\n",i, j);
-			if(!table[i][j]){
-				//printf("first empty: (%d,%d)\n",i, j);
+	
+	for(;i < N; i++) {
+		for(; j < N; j++) {
+			if(!table[i][j]) {
 				next = Simple(i, j);
 				i = j = N;
 				break;
@@ -393,8 +387,7 @@ simple getNextElement(int** table, int x, int y) {
 		}
 		j= 0;
 	}
-	//printf("previous: (%d,%d)\n\n",x,y);
-	//printf("next: (%d,%d)\n",next->x,next->y);
+	
 	return next;
 }
 
@@ -418,25 +411,15 @@ void genNodes(element* parent) {
 	if(nextPos.x == -1){
 		return;
 	}
-
+	
 	for(value = 1; value <= N; value++){
 		valid = isValid(table, nextPos.x, nextPos.y, value);
-		//printf("%d is valid in (%d,%d)? -> %d\n",value,nextPos.x,nextPos.y,valid);
-		if(valid){
+		if(valid) {
 			child = Element(table, nextPos.x,nextPos.y,value);
-			//printf("inserting %d from (%d,%d)\n",value,nextPos.x,nextPos.y);
 			#pragma omp critical
-			{
-				pushElement(child);				
-			}
-			//printf("inserted\n");
-			//printStack();
+			{ pushElement(child); }
 		}
 	}
-	//printf("im gonna free %d from (%d,%d)\n",next->value,next->x,next->y);
-	//printStack();
-	//printStack();
-	//printf("what?\n");
 }
 
 /****************************************************************************/
@@ -461,165 +444,52 @@ int iterativeSolve(puzzle* board, int nthreads) {
 	{
 		int tid = omp_get_thread_num();
 
-		while(!terminated){
-			//printf("size=%d\n",size);
-			//printf("\n****Thread(%d) vvv****\n",tid);
-
-			//printStack();
+		while(!terminated) {
 			#pragma omp critical
 			{
-				//printf("\n--Thread(%d) popping!!\n",tid);
 				current = popElement();
-				/*if(current != NULL)
-					//printf("*****sCurrent(%d): %d in (%d,%d)\n", tid ,current->value,current->x,current->y);
-				else{
-					//printf("Current(%d): NULL :(\n", tid);
-				}*/
 			}
 			
-			//printf("?");
-			//getchar();
-			if(current != NULL){
-				//printf("Current(%d): %d in (%d,%d)\n", tid, current->value,current->x,current->y);
-			//	printBoard(current->table);
+			if (current != NULL) {
 				genNodes(current);
 				
-				//printf("stillAlive\n");
 				if(solved(current->table)){
-					//printf("finishing!(%d)\n",tid);
 					terminated = 1;
 					hasSolution = 1;
 					for(int i= 0;i < N;i++)
 						for(int j = 0;j < N; j++)
 							solution[i][j] = current->table[i][j];
 				}
-				//printf("YESYES\n");
+				
 				freeElement(current);
-				//printf("NONO\n");
-			}
-			else{
-				//printf("\n--Thread(%d) is here!!\n",tid);
+				
+			} else {
 				top = head;				
-				while(top == NULL && sumStucks < nthreads && !terminated){
-					//printf("i'm stuck hhere (%d)\n",tid);
+				while(top == NULL && sumStucks < nthreads && !terminated) {
 					stucks[tid] = 1;
 					sumStucks = 0;
 					for(int t = 0; t < nthreads; t++) {
 						sumStucks += stucks[t];
 					}
-					top = head;				
-					//printf("???\n");
+					top = head;	
 					#pragma omp flush
-
 				}
+				
 				for(int t = 0; t < nthreads; t++) {
 					stucks[t] = 0;
 				}
+				
 				if(sumStucks == nthreads){
-					//printf("ITS OVER! sum =%d\n",sumStucks);
 					hasSolution = 0;
 					terminated = 1;
-				}
-				//if(terminated)
-					//printf("BAILED!(%d)\n",tid);
-			}
-		}
-	}
-	/*printf("IS IT HERE?\n");
-	freeStack();
-	printf("NO\n");*/
-	return hasSolution;
-}
-
-// 	element stack[board->N * board->N * board->N];
-	/*element stack[MAX_STACK_SIZE];
-	int stackPtr = -1;
-	int progress = 0;
-	#pragma omp parallel for
-	for (int i = 0; i < board->N; i++) {
-		for (int j = 0; j < board->N; j++) {
-			
-			// if empty cell
-			if (!board->table[i][j]) {
-				for (int value = board->N; value > 0; value--) {
-					// add candidates to stack
-					if (isValid(board, i, j, value)) {
-						stackPtr++;
-						stack[stackPtr].x = i;
-						stack[stackPtr].y = j;
-						stack[stackPtr].value = value;
-						stack[stackPtr].expanded = 0;
-						
-						progress = 1;
-					}
-				}
-				
-				// if no candidates added, revert last branch of changes
-				if (!progress) {
-					while (stack[stackPtr].expanded) {
-						i = stack[stackPtr].x;
-						j = stack[stackPtr].y;
-						board->table[i][j] = 0;
-						stackPtr--;
-					}
-				}
-				
-				if (stackPtr >= 0) {
-					// pick a candidate for the next iteration
-					i = stack[stackPtr].x;
-					j = stack[stackPtr].y;
-					board->table[i][j] = stack[stackPtr].value;
-					stack[stackPtr].expanded = 1;
-					
-					progress = 0;
-					
-				} else {
-					// nothing left to try, there is no solution
 				}
 			}
 		}
 	}
 	
-	return solved(board);*/
+// 	freeStack();
+	return hasSolution;
+}
 
-/*
-int isValid(puzzle* board, int row, int column, int number) {
-		
-    int rowStart = (row/board->L) * board->L;
-    int colStart = (column/board->L) * board->L;
-    int flag = 1;    	
-    int iFromBlock;
-    int jFromBlock;
 
-    #pragma omp parallel
-    for(int i = 0; i < board->N; ++i) {
-        
-        if (board->table[row][i] == number) {
-            #pragma omp critical
-            {
-                flag = 0;
-            }
-            #pragma omp cancel parallel
-        }
-        
-	if (board->table[i][column] == number) {
-            #pragma omp critical
-            {
-                flag = 0;
-            }
-            #pragma omp cancel parallel
-        }
 
-        iFromBlock = rowStart + (i % board->L);
-        jFromBlock = colStart + (i / board->L);
-        
-	if (board->table[iFromBlock][jFromBlock] == number) {
-            #pragma omp critical
-            {
-                flag = 0;
-            }
-            #pragma omp cancel parallel
-        }
-    }
-    return flag;
-}*/

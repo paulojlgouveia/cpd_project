@@ -17,6 +17,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <omp.h>
+
 
 // 81 spaces, 162 cells (2 digits), '\n', '\0', possible '\r'
 #define MAX_LINE_SIZE 246
@@ -60,7 +62,8 @@ int iterativeSolve(puzzle* board);
 int main(int argc, char *argv[]) {
 
 	puzzle *board;
-	
+	double time;
+
 	if(argc < 2){
 		printf("missing argument.\nusage: sudoku-serial <filename>\n");
 		exit(1);
@@ -68,7 +71,7 @@ int main(int argc, char *argv[]) {
 	
 	board = getPuzzleFromFile(argv[1]);
 	
-	
+	time = omp_get_wtime();
 // 	if (recursiveSolve(board, 0, 0)) {
 	if (iterativeSolve(board)) {
 		printBoard(board);
@@ -77,6 +80,8 @@ int main(int argc, char *argv[]) {
 		printf("No solution.\n");
 	}
 	
+	time = omp_get_wtime() -time;
+	printf("Time: %f seconds\n",time);
 	
 	freePuzzle(board);
 	return 0;
