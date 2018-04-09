@@ -1,7 +1,7 @@
 /****************************************************************************
 * 																			*
 * Parallel and Distributed Computing 										*
-* project part 2															*
+* project part 1															*
 * 																			*
 * group 4, Alameda															*
 * 																			*

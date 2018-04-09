@@ -10,7 +10,7 @@
 * 76213 Gonçalo Lopes														*
 * 70969 Mario Reis															*
 * 																			*
-* Serial implementation														*
+* MPI implementation														*
 * 																			*
 *****************************************************************************/
 
