@@ -1,56 +1,52 @@
 
-FLAGS=-fopenmp -ansi -pedantic -Wall -Wno-unused-result -O3 -lm -std=c99
+# increase if needed due to network latency
+timeout=10
+# ist username and password
+user='ist175657'
+pw='L18fPGfPjlU'
+# directory inside afs to temporarily store files
+afs_dir='~/'
+# group password for the cluster
+cluster_pw='QBtMUdds7PAx0dDoZQ/c'
+# cluster server (cpd04@cpd-$machine)
+machine=2
+# owned directory inside the cluster
+start_dir='paulo/'
+# source file to compile
+src_file='sudoku-mpi.c'
+# arguments for the executable
+args='input/9x9.in'
 
-out=""
 
 
-all: compile
+install:
+	sudo apt-get install expect 
 
-compile: clean serial omp mpi
-
-
-clean:
-# 	@clear
-	@rm -f *.o
-	@rm -f sudoku-serial sudoku-omp sudoku-mpi
-	@rm -f output/*
-	@rm -f *.zip
-	@rm -f massif.out.*
 
 	
-serial:
-	@gcc $(FLAGS) sudoku-serial.c -o sudoku-serial
+login-rnl:
+	./.login-rnl.sh ${timeout} ${user} ${pw}
+
+login-cluster:
+	./.login-cluster.sh ${timeout} ${user} ${pw} ${cluster_pw} ${machine} ${start_dir}
+
 	
-omp:
-	@gcc $(FLAGS) sudoku-omp.c -o sudoku-omp
+
+upload-files:
+	./.upload-files.sh ${timeout} ${user} ${pw} ${machine} ${cluster_pw} ${start_dir}
 	
-mpi:
-# 	@gcc $(FLAGS) sudoku-mpi.c -o sudoku-mpi
+compile:
+	./.compile.sh ${timeout} ${user} ${pw} ${machine} ${cluster_pw} ${start_dir} ${src_file}
+
+run:
+	./.run.sh ${timeout} ${user} ${pw} ${machine} ${cluster_pw} ${start_dir} ${args}
+
 	
-	
-run: compile
-	@echo 'serial'; for f in input/*.in; do echo '\n'$$f; time ./sudoku-serial $$f; done
-	@echo 'omp_2'; for f in input/*.in; do echo '\n'$$f; time ./sudoku-omp $$f 2; done
-	@echo 'omp_4'; for f in input/*.in; do echo '\n'$$f; time ./sudoku-omp $$f 4; done
-	@echo 'omp_8'; for f in input/*.in; do echo '\n'$$f; time ./sudoku-omp $$f 8; done
-# 	@for file in input/*.in; do echo $$file; ./sudoku-mpi $$file; done
-	@echo
+compile-run: compile run
 
 
-test: compile
-	@echo
-	@./tests.sh
 
+show:
+	./.open-output.sh ${timeout} ${user} ${pw} ${cluster_pw} ${machine} ${start_dir}
 
-valgrind: compile
-	valgrind -v --leak-check=full ./sudoku-serial input/ex2.in
-	valgrind -v --leak-check=full ./sudoku-omp input/4x4.in 4
-# 	valgrind -v --leak-check=full ./sudoku-mpi input/ex2.in
 	
-	
-submission:
-	zip omp_g04A.zip sudoku-serial.c sudoku-omp.c report-omp.pdf makefile
-	
-submission2:
-	zip mpi_g04A.zip sudoku-serial.c sudoku-mpi.c report-mpi.pdf
-
