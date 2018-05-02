@@ -4,6 +4,7 @@ sudoku-serial
 sudoku-omp
 sudoku-mpi
 *.kate-swp
+makefile
 
 
 # Prerequisites
