@@ -27,8 +27,17 @@ send -- $rnl_pw\r
 
 expect "$user@borg:*"
 send -- "sftp cpd04@cpd-$machine\r"
-expect "*?assword:*"
-send -- $cluster_pw\r
+while {1} {
+	sleep 1
+	expect {
+		eof							{ break }
+		"*?assword:*"				{ send -- $cluster_pw\r; break }
+		"The authenticity of host"	{ send "yes\r" }
+		"*cpd04@*"					{ send "exit\r" }
+	}
+}
+
+
 expect "sftp>"
 send -- "cd $start_dir\r"
 expect "sftp>"
@@ -39,8 +48,15 @@ send -- "exit\r"
 
 expect "$user@borg:*"
 send -- "ssh cpd04@cpd-$machine\r"
-expect "*?assword:*"
-send -- $cluster_pw\r
+while {1} {
+	sleep 1
+	expect {
+		eof							{ break }
+		"*?assword:*"				{ send -- $cluster_pw\r; break }
+		"The authenticity of host"	{ send "yes\r" }
+		"*cpd04@*"					{ send "exit\r" }
+	}
+}
 expect "Have a lot of fun..."
 send -- "cd $start_dir\r"
 expect "*cpd04@*"

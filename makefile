@@ -9,7 +9,7 @@ afs_dir='~/'
 # group password for the cluster
 cluster_pw='QBtMUdds7PAx0dDoZQ/c'
 # cluster server (cpd04@cpd-$machine)
-machine=2
+machine=7
 # owned directory inside the cluster
 start_dir='paulo/'
 # source file to compile
@@ -20,7 +20,16 @@ args='input/9x9.in'
 
 
 install:
-	sudo apt-get install expect 
+	sudo apt-get install expect
+	
+	
+permissions:
+	chmod +x .compile.sh
+	chmod +x .login-cluster.sh
+	chmod +x .login-rnl.sh
+	chmod +x .open-output.sh
+	chmod +x .run.sh
+	chmod +x .upload-files.sh
 
 
 	

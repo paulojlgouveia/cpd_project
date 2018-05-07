@@ -17,14 +17,20 @@ send -- $rnl_pw\r
 
 expect "$user@borg:*"
 send -- "ssh cpd04@cpd-$machine\r"
-expect "*?assword:*"
-send -- $cluster_pw\r
+while {1} {
+	sleep 1
+	expect {
+		eof							{ break }
+		"*?assword:*"				{ send -- $cluster_pw\r; break }
+		"The authenticity of host"	{ send "yes\r" }
+		"*cpd04@*"					{ send "exit\r" }
+	}
+}
 
 expect "Have a lot of fun..."
 send -- "cd $start_dir; clear\r"
 expect "*cpd04@*"
 send -- "mpirun --hostfile nodes.txt exe $args > output.txt\r"
-
 
 while {1} {
 	sleep 1
@@ -36,8 +42,8 @@ while {1} {
 }
 
 
-# sleep 1
-wait
+sleep 1
+# wait
 expect "$user@borg:*"
 send -- "exit\r"
 
