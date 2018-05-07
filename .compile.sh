@@ -57,6 +57,7 @@ while {1} {
 		"*cpd04@*"					{ send "exit\r" }
 	}
 }
+
 expect "Have a lot of fun..."
 send -- "cd $start_dir\r"
 expect "*cpd04@*"

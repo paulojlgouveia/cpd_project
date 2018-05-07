@@ -9,7 +9,7 @@ afs_dir='~/'
 # group password for the cluster
 cluster_pw='QBtMUdds7PAx0dDoZQ/c'
 # cluster server (cpd04@cpd-$machine)
-machine=7
+machine=9
 # owned directory inside the cluster
 start_dir='paulo/'
 # source file to compile
