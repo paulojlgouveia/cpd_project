@@ -18,11 +18,14 @@ src_file='sudoku-mpi.c'
 args='input/9x9.in'
 
 
+SERIAL_FLAGS=-fopenmp -ansi -pedantic -Wall -Wno-unused-result -O3 -lm -std=c99
+MPI_FLAGS=-fopenmp -ansi -pedantic -Wall -Wno-unused-result -O3 -lm -std=c99
+
 
 install:
 	sudo apt-get install expect
-	
-	
+	sudo apt-get install libopenmpi-dev openmpi-bin
+
 permissions:
 	chmod +x .compile.sh
 	chmod +x .login-cluster.sh
@@ -32,6 +35,30 @@ permissions:
 	chmod +x .upload-files.sh
 
 
+#################################################################################################
+
+clean:
+# 	@clear
+	@rm -f *.o
+	@rm -f sudoku-serial sudoku-omp sudoku-mpi
+	@rm -f output/*
+	@rm -f *.zip
+	@rm -f massif.out.*
+
+
+serial:
+	gcc $(SERIAL_FLAGS) sudoku-serial.c -o sudoku-serial
+	valgrind -v --leak-check=full --show-leak-kinds=all ./sudoku-serial input/9x9.in
+
+
+mpi:
+	mpicc $(MPI_FLAGS) sudoku-mpi.c -o sudoku-mpi
+	mpirun sudoku-mpi input/9x9.in
+# 	valgrind -v --leak-check=full --show-leak-kinds=all ./sudoku-mpi input/9x9.in
+	
+	
+	
+#################################################################################################
 	
 login-rnl:
 	./.login-rnl.sh ${timeout} ${user} ${pw}
@@ -40,9 +67,9 @@ login-cluster:
 	./.login-cluster.sh ${timeout} ${user} ${pw} ${cluster_pw} ${machine} ${start_dir}
 
 	
-
 upload-files:
 	./.upload-files.sh ${timeout} ${user} ${pw} ${machine} ${cluster_pw} ${start_dir}
+
 	
 compile:
 	./.compile.sh ${timeout} ${user} ${pw} ${machine} ${cluster_pw} ${start_dir} ${src_file}
@@ -50,12 +77,13 @@ compile:
 run:
 	./.run.sh ${timeout} ${user} ${pw} ${machine} ${cluster_pw} ${start_dir} ${args}
 
-	
 compile-run: compile run
-
 
 
 show:
 	./.open-output.sh ${timeout} ${user} ${pw} ${cluster_pw} ${machine} ${start_dir}
 
+
+
+	
 	

@@ -18,12 +18,21 @@
 #include <stdlib.h>
 #include <string.h>
 #include <omp.h>
+#include <mpi.h>
 
 
 // 81 spaces, 162 cells (2 digits), '\n', '\0', possible '\r'
 #define MAX_LINE_SIZE 246
-// 81^2 + (81*80)/2 , board size + candidates per cell
+// 9^2=81 => 81^2 + (81*80)/2 , board size + candidates per cell
 #define MAX_STACK_SIZE 9801
+
+#define FAILED_BRACH 1
+#define NEW_NODES 2
+#define SOLVED 3
+
+#define MSG_EXIT 1
+#define MSG_PRINT_ORDERED 2
+#define MSG_PRINT_UNORDERED 3
 
 
 /****************************************************************************/
@@ -39,53 +48,122 @@ typedef struct element {
 	int expanded;
 } element;
 
-
 /****************************************************************************/
 
 puzzle* Puzzle(int modSize);
 puzzle* getPuzzleFromFile(char *inputFile);
+
+int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename);
+int slave(MPI_Comm master_comm, MPI_Comm new_comm);
 void freePuzzle(puzzle *board);
 
-void printSolution(puzzle *board);
 void printBoard(puzzle *board);
-void printStack(element* stack, int from, int to);
-
-int valid(puzzle* board, int row, int column, int number);
-int solved(puzzle* board);
-
-int recursiveSolve(puzzle* board, int row, int column);
-int iterativeSolve(puzzle* board);
 
 
 /****************************************************************************/
 
-int main(int argc, char *argv[]) {
-
+int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
+	int i,j;
+	int size, nslave, firstmsg;
+	char buf[256], buf2[256];
+	MPI_Status status;
+	
+	
 	puzzle *board;
 	double time;
 
-	if(argc < 2){
-		printf("missing argument.\nusage: sudoku-serial <filename>\n");
-		exit(1);
-	}
 	
-	board = getPuzzleFromFile(argv[1]);
+	board = getPuzzleFromFile(filename);
 	
 	time = omp_get_wtime();
-// 	if (recursiveSolve(board, 0, 0)) {
-	if (iterativeSolve(board)) {
-		printBoard(board);
-		
-	} else {
-		printf("No solution.\n");
+	
+
+	MPI_Comm_size(master_comm, &size);
+	nslave = size - 1;
+	while (nslave > 0) {
+		MPI_Recv(buf, 256, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);
+		switch (status.MPI_TAG) {
+			case MSG_EXIT:
+				nslave--;
+				break;
+				
+			case MSG_PRINT_UNORDERED:
+				fputs(buf, stdout);
+				break;
+				
+			case MSG_PRINT_ORDERED:
+				/* This lets us get any of the ordered messages first, and then
+				start printing them.  There are other ways to do this
+				(see related exercises) */
+				firstmsg = status.MPI_SOURCE;
+				for (i = 1; i<size; i++) {
+					
+					if (i == firstmsg) {
+						fputs(buf, stdout);
+						
+					} else {
+						MPI_Recv(buf2, 256, MPI_CHAR, i, MSG_PRINT_ORDERED, master_comm, &status);
+						fputs(buf2, stdout);
+					}
+				}
+				break;
+		}
 	}
 	
 	time = omp_get_wtime() -time;
 	printf("Time: %f seconds\n",time);
 	
+	printBoard(board);
+	
 	freePuzzle(board);
+	return 0;}
+
+
+int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
+	char buf[256];
+	int rank;
+	
+	MPI_Comm_rank(new_comm, &rank);
+	sprintf(buf, "Hello from slave %d\n", rank);
+	MPI_Send(buf, strlen(buf) + 1, MPI_CHAR, 0, MSG_PRINT_UNORDERED, master_comm);
+	
+	sprintf(buf, "Goodbye from slave %d\n", rank);
+	MPI_Send(buf, strlen(buf) + 1, MPI_CHAR, 0, MSG_PRINT_ORDERED, master_comm);
+
+	sprintf(buf, "I'm exiting (%d)\n", rank);
+	MPI_Send(buf, strlen(buf) + 1, MPI_CHAR, 0, MSG_PRINT_UNORDERED, master_comm);
+
+	MPI_Send(buf, 0, MPI_CHAR, 0, MSG_EXIT, master_comm);
+	
 	return 0;
 }
+
+
+
+int main(int argc, char *argv[]) {
+	int rank, size;
+	MPI_Comm new_comm;
+	
+	
+	if(argc < 2){
+		printf("missing argument.\nusage: sudoku-serial <filename>\n");
+		exit(1);
+	}
+
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_split(MPI_COMM_WORLD, rank == 0, 0, &new_comm);
+	
+	if (rank == 0)
+		master(MPI_COMM_WORLD, new_comm, argv[1]);
+	else
+		slave(MPI_COMM_WORLD, new_comm);
+	
+	MPI_Finalize();
+	return 0;
+}
+
+
 
 
 /****************************************************************************/
@@ -155,19 +233,8 @@ void freePuzzle(puzzle *board) {
 }
 
 
-/****************************************************************************/
-
-void printSolution(puzzle *board) {
-	for (int i = 0; i < board->N; i++) {
-		for (int j = 0; j < board->N; j++) {
-			printf("%d ", board->table[i][j]);
-		}
-		printf("\n");
-	}
-}
 
 void printBoard(puzzle *board) {
-	
 	if (board->N > 9) {
 		for (int i = 0; i < board->N; i++) {
 			for (int j = 0; j < board->N; j++) {
@@ -186,147 +253,3 @@ void printBoard(puzzle *board) {
 	}
 	printf("\n");
 }
-
-void printStack(element* stack, int from, int toInclusive) {
-	for (int t = from; t <= toInclusive; t++)
-		printf("%4d: (%d,%d) %2d\n", t, stack[t].x, stack[t].y, stack[t].value);
-	
-	printf("\n");
-}
-
-
-/****************************************************************************/
-
-int isValid(puzzle* board, int row, int column, int number) {
-		
-    int rowStart = (row/board->L) * board->L;
-    int colStart = (column/board->L) * board->L;
-
-    for(int i = 0; i < board->N; ++i) {
-        if (board->table[row][i] == number)
-			return 0;
-		
-        if (board->table[i][column] == number)
-			return 0;
-		
-		int iFromBlock = rowStart + (i % board->L);
-		int jFromBlock = colStart + (i / board->L);
-		
-        if (board->table[iFromBlock][jFromBlock] == number)
-			return 0;
-    }
-    
-    return 1;
-}
-
-int solved(puzzle* board) {
-	for (int i = board->N-1; i > -1; i--)
-		for (int j = board->N-1; j > -1; j--)
-			if (board->table[i][j] == 0)
-				return 0;
-		
-	return 1;
-}
-
-
-/****************************************************************************/
-
-int recursiveSolve(puzzle* board, int row, int column) {
-	
-	// if not reached the end of the board
-	if (row < board->N && column < board->N) {
-		
-		if (board->table[row][column]) {
-			if (column+1 < board->N) {
-				return recursiveSolve(board, row, column+1);
-				
-			} else if (row+1 < board->N) {
-				return recursiveSolve(board, row+1, 0);
-				
-			} else
-				return 1;
-			
-		} else {
-			for(int i = 0; i < board->N; ++i) {
-				if (isValid(board, row, column, i+1)) {
-					board->table[row][column] = i+1;
-					if (column+1 < board->N) {
-						if (recursiveSolve(board, row, column+1))
-							return 1;
-						else
-							board->table[row][column] = 0;
-						
-					} else if (row+1 < board->N) {
-						if (recursiveSolve(board, row+1, 0))
-							return 1;
-						else
-							board->table[row][column] = 0;
-						
-					} else {
-						return 1;
-					}
-				}
-			}
-		}
-		
-		return 0;
-		
-	} else {
-		return 1;
-	}
-}
-
-int iterativeSolve(puzzle* board) {
-// 	element stack[board->N * board->N * board->N];
-	element stack[MAX_STACK_SIZE];
-	int stackPtr = -1;
-	int progress = 0;
-	
-	for (int i = 0; i < board->N; i++) {
-		for (int j = 0; j < board->N; j++) {
-			
-			// if empty cell
-			if (!board->table[i][j]) {
-				for (int value = board->N; value > 0; value--) {
-					// add candidates to stack
-					if (isValid(board, i, j, value)) {
-						stackPtr++;
-						stack[stackPtr].x = i;
-						stack[stackPtr].y = j;
-						stack[stackPtr].value = value;
-						stack[stackPtr].expanded = 0;
-						
-						progress = 1;
-					}
-				}
-				
-				// if no candidates added, revert last branch of changes
-				if (!progress) {
-					while (stack[stackPtr].expanded) {
-						i = stack[stackPtr].x;
-						j = stack[stackPtr].y;
-						board->table[i][j] = 0;
-						stackPtr--;
-					}
-				}
-				
-				if (stackPtr >= 0) {
-					// pick a candidate for the next iteration
-					i = stack[stackPtr].x;
-					j = stack[stackPtr].y;
-					board->table[i][j] = stack[stackPtr].value;
-					stack[stackPtr].expanded = 1;
-					
-					progress = 0;
-					
-				} else {
-					// nothing left to try, there is no solution
-					return 0;
-				}
-			}
-		}
-	}
-	
-	return solved(board);
-}
-

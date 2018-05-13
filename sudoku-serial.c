@@ -167,7 +167,6 @@ void printSolution(puzzle *board) {
 }
 
 void printBoard(puzzle *board) {
-	
 	if (board->N > 9) {
 		for (int i = 0; i < board->N; i++) {
 			for (int j = 0; j < board->N; j++) {
