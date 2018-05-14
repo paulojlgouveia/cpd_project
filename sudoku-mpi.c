@@ -26,7 +26,7 @@
 // 9^2=81 => 81^2 + (81*80)/2 , board size + candidates per cell
 #define MAX_STACK_SIZE 9801
 
-#define FAILED_BRACH 1
+#define CLOSED_BRACH 1
 #define NEW_NODES 2
 #define SOLVED 3
 
@@ -35,45 +35,61 @@
 #define MSG_PRINT_UNORDERED 3
 
 
-/****************************************************************************/
-
-typedef struct puzzle {
-	int L, N;
-	int **table;
-} puzzle;
-
-typedef struct element {
-	int x, y;
-	int value;
-	int expanded;
-} element;
 
 /****************************************************************************/
 
-puzzle* Puzzle(int modSize);
-puzzle* getPuzzleFromFile(char *inputFile);
+int **Board(int SIZE);
+void getPuzzleFromFile(FILE *fp, int **board, int SIZE);
 
 int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename);
 int slave(MPI_Comm master_comm, MPI_Comm new_comm);
-void freePuzzle(puzzle *board);
+void freeBoard(int **board, int SIZE);
 
-void printBoard(puzzle *board);
+void printBoard(int **board, int SIZE);
+
 
 
 /****************************************************************************/
 
 int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
+	char buf[256], buf2[256];
 	int i,j;
 	int size, nslave, firstmsg;
-	char buf[256], buf2[256];
 	MPI_Status status;
-	
-	
-	puzzle *board;
+		
+	FILE *fp;
+	int L, N;
+	int **board;
 	double time;
 
 	
-	board = getPuzzleFromFile(filename);
+	// read initial board from the input file
+	fp = fopen(filename, "r");
+	if (fp == NULL) {
+		printf("failed to read input file: '%s'\n", filename);
+		exit(2);
+		
+	} else {
+		// read first line and compute board size
+		fgets(buf, MAX_LINE_SIZE, fp);
+		sscanf(buf,"%d", &L);
+		N = L*L;
+		
+		// FIXME send L to slaves
+		
+		// initialize the board
+		board = Board(N);
+		getPuzzleFromFile(fp, board, N);		
+	}
+	
+	fclose(fp);
+	
+	// FIXME malloc vector for receiving generated nodes
+	
+	// FIXME expand first board
+	
+	// FIXME loop send nodes / receive nodes
+	
 	
 	time = omp_get_wtime();
 	
@@ -97,7 +113,6 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 				(see related exercises) */
 				firstmsg = status.MPI_SOURCE;
 				for (i = 1; i<size; i++) {
-					
 					if (i == firstmsg) {
 						fputs(buf, stdout);
 						
@@ -113,15 +128,30 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	time = omp_get_wtime() -time;
 	printf("Time: %f seconds\n",time);
 	
-	printBoard(board);
 	
-	freePuzzle(board);
-	return 0;}
+	printBoard(board, N);
+	
+	// FIXME free structures
+	freeBoard(board, N);
+	return 0;
+}
 
 
 int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 	char buf[256];
 	int rank;
+	
+	
+	// FIXME receive L and compute N
+	
+	// FIXME malloc matrix for receiving
+	
+	// FIXME malloc matrix vector for expanded nodes
+	
+	// FIXME loop receive matrix, generate nodes, check solution, send new nodes
+	
+	
+	
 	
 	MPI_Comm_rank(new_comm, &rank);
 	sprintf(buf, "Hello from slave %d\n", rank);
@@ -168,85 +198,57 @@ int main(int argc, char *argv[]) {
 
 /****************************************************************************/
 
-puzzle* Puzzle(int modSize) {
-	puzzle* board = malloc(sizeof(puzzle));
+int **Board(int SIZE) {
+	int **board;
 	
-	board->L = modSize;
-	board->N = modSize * modSize;
-	
-	board->table = (int**) malloc(board->N * sizeof(int*));
-	for (int i = 0; i < board->N; i++) 
-		board->table[i] = (int*) malloc(board->N * sizeof(int));
+	board = (int**) malloc(SIZE * sizeof(int*));
+	for (int i = 0; i < SIZE; i++) 
+		board[i] = (int*) malloc(SIZE * sizeof(int));
 	
 	return board;
 }
 
-puzzle* getPuzzleFromFile(char *inputFile) {
-	
-	FILE *file;
-	int modSize;
+void getPuzzleFromFile(FILE *fp, int **board, int SIZE) {
 	char line[MAX_LINE_SIZE];
 	char* inputCell;
 	
-	puzzle* board;
-	
-	// read initial board from the input file
-	file = fopen(inputFile, "r");
-	if (file == NULL) {	
-		printf("failed to read input file: '%s'\n", inputFile);
-		exit(2);
-	
-	} else {
-		// read first line (board size)
-		fgets(line, MAX_LINE_SIZE, file);
-		sscanf(line,"%d", &modSize);
-		
-		// initialize the board
-		board = Puzzle(modSize);
-		
-		for (int i = 0; i < board->N; i++) {
-			if (fgets(line, MAX_LINE_SIZE, file) != NULL) {
-				inputCell = strtok(line, " ");
-				for (int j = 0; j < board->N; j++) {
-					board->table[i][j] = atoi(inputCell);					
-					inputCell = strtok(NULL, " ");
-				}
-				
-			} else {
-				printf("ill formed file '%s'\n", inputFile);
-				exit(3);
+	for (int i = 0; i < SIZE; i++) {
+		if (fgets(line, MAX_LINE_SIZE, fp) != NULL) {
+			inputCell = strtok(line, " ");
+			for (int j = 0; j < SIZE; j++) {
+				board[i][j] = atoi(inputCell);					
+				inputCell = strtok(NULL, " ");
 			}
+			
+		} else {
+			printf("ill formed file. \n");
+			exit(3);
 		}
-		
-		fclose(file);
 	}
-	
-	return board;
 }
 
-void freePuzzle(puzzle *board) {
-	for (int i = 0; i < board->N; i++) {
-		free(board->table[i]);
-	}  
+void freeBoard(int **board, int SIZE) {
+	for (int i = 0; i < SIZE; i++)
+		free(board[i]);  
 	
 	free(board);
 }
 
 
 
-void printBoard(puzzle *board) {
-	if (board->N > 9) {
-		for (int i = 0; i < board->N; i++) {
-			for (int j = 0; j < board->N; j++) {
-				printf("%2d ", board->table[i][j]);
+void printBoard(int **board, int SIZE) {
+	if (SIZE > 9) {
+		for (int i = 0; i < SIZE; i++) {
+			for (int j = 0; j < SIZE; j++) {
+				printf("%2d ", board[i][j]);
 			}
 			printf("\n");
 		}
 		
 	} else {
-		for (int i = 0; i < board->N; i++) {
-			for (int j = 0; j < board->N; j++) {
-				printf("%d ", board->table[i][j]);
+		for (int i = 0; i < SIZE; i++) {
+			for (int j = 0; j < SIZE; j++) {
+				printf("%d ", board[i][j]);
 			}
 			printf("\n");
 		}

@@ -53,8 +53,8 @@ serial:
 
 mpi:
 	mpicc $(MPI_FLAGS) sudoku-mpi.c -o sudoku-mpi
-	mpirun sudoku-mpi input/9x9.in
-# 	valgrind -v --leak-check=full --show-leak-kinds=all ./sudoku-mpi input/9x9.in
+	mpirun -np 4 sudoku-mpi input/9x9.in
+# 	valgrind -v --leak-check=full --show-leak-kinds=all mpirun -np 4 sudoku-mpi input/9x9.in
 	
 	
 	
