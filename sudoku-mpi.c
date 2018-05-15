@@ -30,9 +30,14 @@
 #define NEW_NODES 2
 #define SOLVED 3
 
+#define L_FROM_FILE 4
+#define MATRIX 5
+
+
 
 /****************************************************************************/
 
+int ***Stack(int SIZE, int DEPTH);
 int **Board(int SIZE);
 void getPuzzleFromFile(FILE *fp, int **board, int SIZE);
 void freeBoard(int **board, int SIZE);
@@ -40,9 +45,11 @@ void freeBoard(int **board, int SIZE);
 int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename);
 int slave(MPI_Comm master_comm, MPI_Comm new_comm);
 
-int valid(int row, int column, int number, int **board, int BLOCK_SIZE, int BOARD_SIZE);
+int isValid(int row, int column, int number, int **board, int BLOCK_SIZE, int BOARD_SIZE);
+int expandNode(int **board, int BLOCK_SIZE, int BOARD_SIZE, int ***stack, int STACK_SIZE);
 int solved(int **board, int SIZE);
 
+int copyBoard(int **srcBoard, int **dstBoard, int BOARD_SIZE);
 void printBoard(int **board, int SIZE);
 
 
@@ -54,15 +61,23 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	FILE *fp;
 	int L, N;
 	int **board;
+	int ***stack;
 	
-	int i,j;
-	int size, nslave, firstmsg;
+	int i = 0, j = 0;
+	int stackPtr = 0;
 	
 	double time;
 
+	MPI_Status status;
+	int processID;
+	int totalProcesses, slaves, firstmsg;
+
 	char buf[256], buf2[256];
 	
-	MPI_Status status;
+	
+	MPI_Comm_size(master_comm, &totalProcesses);
+	MPI_Comm_rank(new_comm, &processID);
+
 	
 	// read initial board from the input file
 	fp = fopen(filename, "r");
@@ -76,7 +91,8 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 		sscanf(buf,"%d", &L);
 		N = L*L;
 		
-		// FIXME send L to slaves
+		MPI_Bcast(&L, 1, MPI_INT, processID, MPI_COMM_WORLD);
+		
 		
 		// initialize the board
 		board = Board(N);
@@ -85,23 +101,72 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	
 	fclose(fp);
 	
+	
+	
 	// FIXME malloc vector for receiving generated nodes
+	stack = Stack(N, MAX_STACK_SIZE);
+	
 	
 	// FIXME expand first board
+	stackPtr = expandNode(board, L, N, stack, N);
+		
 	
-	// FIXME loop send nodes / receive nodes
+	// send initial nodes; // 0 is master
+	if (totalProcesses < stackPtr) {
+		for (i = 1; i < totalProcesses; i++) {
+			stackPtr--;
+			MPI_Send(&(stack[stackPtr][0][0]), (N+1)*(N+1), MPI_INT, i, NEW_NODES, MPI_COMM_WORLD);
+		}
+		
+	} else {
+		while(stackPtr) {
+			stackPtr--;
+			MPI_Send(&(stack[stackPtr][0][0]), (N+1)*(N+1), MPI_INT, stackPtr, NEW_NODES, MPI_COMM_WORLD);
+		}
+	}
+	
+	
+// 	for (; stackPtr >= 0 || )
 	
 	
 	time = omp_get_wtime();
+	// FIXME loop send nodes / receive nodes
+// 	while(!solved) {
+// 		while(stackPtr >= 0) {
+// 			MPI_Send(&stack[stackPtr][0][0], N*N, MPI_INT, 1, NEW_NODES, MPI_COMM_WORLD);
+// 			stackPtr--;
+// 		}
+// 		
+// // 		MPI_Recv(buf, 256, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);
+// // 		switch (status.MPI_TAG) {
+// // 			case SOLVED:
+// // 				slaves--;
+// // 				break;
+// // 				
+// // 			case CLOSED_BRACH:
+// // 				fputs(buf, stdout);
+// // 				break;
+// // 				
+// // 			case NEW_NODES:
+// // 				MPI_Recv(&(stack[0][0][stackPtr]), N*N, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+// // 				stackPtr++;
+// // 				
+// // 				break;
+// // 		}
+// 		
+// 		
+// 		stackPtr = expandNode(stack[stackPtr], L, N, stack, N);
+// 	}
+	
+	
 	
 
-	MPI_Comm_size(master_comm, &size);
-	nslave = size - 1;
-	while (nslave > 0) {
+	slaves = totalProcesses - 1;
+	while (slaves > 0) {
 		MPI_Recv(buf, 256, MPI_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);
 		switch (status.MPI_TAG) {
 			case SOLVED:
-				nslave--;
+				slaves--;
 				break;
 				
 			case CLOSED_BRACH:
@@ -109,11 +174,15 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 				break;
 				
 			case NEW_NODES:
+// 				MPI_Recv(&(stack[0][0][stackPtr]), N*N, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+				stackPtr++;
+				
+				
 				/* This lets us get any of the ordered messages first, and then
 				start printing them.  There are other ways to do this
 				(see related exercises) */
 				firstmsg = status.MPI_SOURCE;
-				for (i = 1; i<size; i++) {
+				for (i = 1; i<totalProcesses; i++) {
 					if (i == firstmsg) {
 						fputs(buf, stdout);
 						
@@ -128,8 +197,6 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	
 	time = omp_get_wtime() -time;
 	printf("solved: %d\nTime: %f seconds\n", solved(board, N), time);
-	
-	
 	printBoard(board, N);
 	
 	// FIXME free structures
@@ -140,28 +207,67 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 
 int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 	char buf[256];
-	int rank;
+	int processID;
+	MPI_Status status;
+	
+	int L, N;
+	int **board;
+	int ***stack;
+	int stackSize;
+	
+	int solved = 0;
 	
 	
-	// FIXME receive L and compute N
+	MPI_Comm_rank(new_comm, &processID);
 	
-	// FIXME malloc matrix for receiving
 	
+	MPI_Bcast(&L, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	N = L*L;
+	
+	board = Board(N);
 	// FIXME malloc matrix vector for expanded nodes
-	
-	// FIXME loop receive matrix, generate nodes, check solution, send new nodes
-	
+	stack = Stack(N, N);
 	
 	
+	MPI_Recv(&(board[0][0]), (N+1)*(N+1), MPI_INT, 0, NEW_NODES, MPI_COMM_WORLD, &status);
 	
-	MPI_Comm_rank(new_comm, &rank);
-	sprintf(buf, "Hello from slave %d\n", rank);
+	
+	printBoard(board, N);
+	printf("\n");
+
+
+
+
+// 	// FIXME loop receive matrix, generate nodes, check solution, send new nodes
+// 	while (!solved) {
+// 		printf("slave - 1\n");
+// 		MPI_Recv(&(board[0][0]), N*N, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+// 		printf("slave - 2\n");
+// 		
+// 		switch (status.MPI_TAG) {
+// 			case SOLVED:
+// // 				return 0;
+// 				solved = 1;
+// 				break;
+// 				
+// 			case NEW_NODES:
+// 				if ((stackSize = expandNode(board, L, N, stack, N))) {
+// 					// FIXME send new nodes to master
+// 				}
+// 				break;
+// 		}
+// 	}
+	
+	
+	
+	
+	sprintf(buf, "Hello from slave %d\n", processID);
 	MPI_Send(buf, strlen(buf) + 1, MPI_CHAR, 0, NEW_NODES, master_comm);
 	
-	sprintf(buf, "Goodbye from slave %d\n", rank);
+	sprintf(buf, "Goodbye from slave %d\n", processID);
 	MPI_Send(buf, strlen(buf) + 1, MPI_CHAR, 0, NEW_NODES, master_comm);
 
-	sprintf(buf, "I'm exiting (%d)\n", rank);
+	sprintf(buf, "I'm exiting (%d)\n", processID);
 	MPI_Send(buf, strlen(buf) + 1, MPI_CHAR, 0, CLOSED_BRACH, master_comm);
 
 	MPI_Send(buf, 0, MPI_CHAR, 0, SOLVED, master_comm);
@@ -172,7 +278,7 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 
 
 int main(int argc, char *argv[]) {
-	int rank, size;
+	int processID;
 	MPI_Comm new_comm;
 	
 	
@@ -182,10 +288,10 @@ int main(int argc, char *argv[]) {
 	}
 
 	MPI_Init(&argc, &argv);
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	MPI_Comm_split(MPI_COMM_WORLD, rank == 0, 0, &new_comm);
+	MPI_Comm_rank(MPI_COMM_WORLD, &processID);
+	MPI_Comm_split(MPI_COMM_WORLD, processID == 0, 0, &new_comm);
 	
-	if (rank == 0)
+	if (processID == 0)
 		master(MPI_COMM_WORLD, new_comm, argv[1]);
 	else
 		slave(MPI_COMM_WORLD, new_comm);
@@ -198,6 +304,19 @@ int main(int argc, char *argv[]) {
 
 
 /****************************************************************************/
+
+int ***Stack(int SIZE, int DEPTH) {
+	int ***stack;
+	
+	stack = (int***) malloc(DEPTH * sizeof(int**));
+	for (int i = 0; i < SIZE; i++) {
+		stack[i] = (int**) malloc(SIZE * sizeof(int*));
+		for (int j = 0; j < SIZE; j++)
+			stack[i][j] = (int*) malloc(SIZE * sizeof(int));
+	}
+	
+	return stack;
+}
 
 int **Board(int SIZE) {
 	int **board;
@@ -238,7 +357,7 @@ void freeBoard(int **board, int SIZE) {
 
 /****************************************************************************/
 
-int valid(int row, int column, int number, int **board, int BLOCK_SIZE, int BOARD_SIZE) {
+int isValid(int row, int column, int number, int **board, int BLOCK_SIZE, int BOARD_SIZE) {
 	int rowStart = (row/BLOCK_SIZE) * BLOCK_SIZE;
     int colStart = (column/BLOCK_SIZE) * BLOCK_SIZE;
 
@@ -259,6 +378,38 @@ int valid(int row, int column, int number, int **board, int BLOCK_SIZE, int BOAR
     return 1;
 }
 
+int expandNode(int **board, int BLOCK_SIZE, int BOARD_SIZE, int ***stack, int STACK_SIZE) {
+
+	int stackPtr = 0;
+	
+	int i = 0, j = 0;
+	int value = BOARD_SIZE;
+	
+	for (i = 0; i < BOARD_SIZE; i++) {
+		for (j = 0; j < BOARD_SIZE; j++) {
+			// if empty cell
+			if (!board[i][j]) {
+				for (value = BOARD_SIZE; value > 0; value--) {
+					if (isValid(i, j, value, board, BLOCK_SIZE, BOARD_SIZE)) {
+						copyBoard(board, stack[stackPtr], BOARD_SIZE);
+						stack[stackPtr][i][j] = value;
+						
+						printf("%d\n\n", value);
+						
+						stackPtr++;
+					}
+				}
+			}
+			
+			return stackPtr;
+		}
+	}
+	
+	// allows for check if new nodes where generated
+	return stackPtr;	
+}
+
+
 int solved(int **board, int SIZE) {
 	// checks start from lower right corner, board is filled from the upper left
 	for (int i = SIZE-1; i > -1; i--)
@@ -267,6 +418,13 @@ int solved(int **board, int SIZE) {
 				return 0;
 		
 	return 1;
+}
+
+
+int copyBoard(int **srcBoard, int **dstBoard, int BOARD_SIZE) {
+	for (int i = 0; i < BOARD_SIZE; i++)
+		for (int j = 0; j < BOARD_SIZE; j++)
+			dstBoard[i][j] = srcBoard[i][j];
 }
 
 
