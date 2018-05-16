@@ -33,6 +33,7 @@
 // #define size(n)			((n+1)*(n+1))
 #define size(n)			((n+1)*(n+1)+5)
 #define min(x, y)		((x < y)? (x) : (y))
+#define node(ptr)		&(stack[ptr][0][0])
 
 #define KILL 0
 #define SOLVED 1
@@ -40,14 +41,6 @@
 #define NEW_NODE 3
 #define TRY_AGAIN 4
 
-
-
-// #define CLOSED_BRACH 1
-// #define NEW_NODES 2
-// #define SOLVED 3
-// 
-// #define L_FROM_FILE 4
-// #define MATRIX 5
 
 
 
@@ -82,10 +75,9 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	
 	int L, N;
 	int **board;
-	int ***stack;
 	
-	int p = 0;
 	int stackPtr = 0;
+	int ***stack;
 	
 	double time;
 	int solved = 0;
@@ -125,49 +117,48 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	stack = Stack(N, MAX_STACK_SIZE);
 	
 	stackPtr = expandNode(board, L, N, stack, MAX_STACK_SIZE);
-	printStack(stack, N, stackPtr);
-
-
-	// FIXME generate at least 1 node per process?
-// 	// send initial nodes; // 0 is master
-// 	for (p = 1; p < totalProcesses && stackPtr > 0; p++) {
-// 		stackPtr--;
-// 		MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, p, NEW_NODE, master_comm);
-// 	}
-	
+// 	printStack(stack, N, stackPtr);
 	
 	
 	time = omp_get_wtime();
 	
-	while(!solved) {
+	totalProcesses--; // discount master
+	while(totalProcesses) {
 // 		MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);		
-		MPI_Recv(&(stack[stackPtr][0][0]), size(N), MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);
+		MPI_Recv(node(stackPtr), size(N), MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);
 
 		
 // 		printf("received:\n");
 // 		printBoard(stack[stackPtr], N); // FIXME remove print
-		
-		switch (status.MPI_TAG) {
-			case SOLVED:
-				for (p = 1; p < totalProcesses; p++)
-					MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, p, SOLVED, MPI_COMM_WORLD);
-				solved = 1;
-				break;
-				
-			case REQUEST:
-				if (stackPtr) {
-					stackPtr--;
-					MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, master_comm);
+		if (!solved) {
+			switch (status.MPI_TAG) {
+				case SOLVED:
+					totalProcesses--;
+					stackPtr++;
+					copyBoard(stack[stackPtr-1], board, N);
+					solved = 1;
+					break;
 					
-				} else {
-					MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, status.MPI_SOURCE, TRY_AGAIN, master_comm);
-				}				
-				break;
-				
-			case NEW_NODE:
-// 				MPI_Recv(&(stack[stackPtr][0][0]), size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, master_comm, &status);
-				stackPtr++;
-				break;
+				case REQUEST:
+					if (stackPtr) {
+						stackPtr--;
+						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, master_comm);
+						
+					} else {
+						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, TRY_AGAIN, master_comm);
+					}
+					break;
+					
+				case NEW_NODE:
+					stackPtr++;
+					break;
+			}
+			
+		} else {
+			if (status.MPI_TAG != SOLVED)
+				MPI_Send(&board[0][0], size(N), MPI_INT, status.MPI_SOURCE, SOLVED, master_comm);
+			
+			totalProcesses--;
 		}
 		
 		
@@ -176,8 +167,10 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 
 	
 	time = omp_get_wtime() -time;
-	printf("solved: %d\nTime: %f seconds\n", isSolved(stack[stackPtr], N), time);
-	printBoard(stack[stackPtr], N);
+	printf("received solved: %d\n", solved);
+	printf("local solved: %d\n", isSolved(board, N));
+	printf("Time: %f seconds\n", time);
+	printBoard(board, N);
 	
 	freeBoard(board, N);
 	freeStack(stack, N, MAX_STACK_SIZE);
@@ -208,8 +201,8 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 	stack = Stack(N, N);
 
 	while(!solved) {
-		MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, 0, REQUEST, master_comm);
-		MPI_Recv(&board[0][0], size(N), MPI_INT, 0, MPI_ANY_TAG, master_comm, &status);
+		MPI_Send(node(stackPtr), size(N), MPI_INT, 0, REQUEST, master_comm);
+		MPI_Recv(&(board[0][0]), size(N), MPI_INT, 0, MPI_ANY_TAG, master_comm, &status);
 		
 // 		printf("received:\n");
 // 		printBoard(board, N); // FIXME remove print
@@ -230,15 +223,15 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 				while(stackPtr) {
 					stackPtr--;
 					if (isSolved(stack[stackPtr], N))
-						MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, 0, SOLVED, master_comm);
+						MPI_Send(node(stackPtr), size(N), MPI_INT, 0, SOLVED, master_comm);
 					else
-						MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, 0, NEW_NODE, master_comm);
+						MPI_Send(node(stackPtr), size(N), MPI_INT, 0, NEW_NODE, master_comm);
 				}
 				break;
 		}
 		
 		
-// 		MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, 0, SOLVED, master_comm);
+// 		MPI_Send(node(stackPtr), size(N), MPI_INT, 0, SOLVED, master_comm);
 	}
 	
 	
@@ -392,8 +385,8 @@ int isValid(int row, int column, int number, int **board, int BLOCK_SIZE, int BO
 
 int isSolved(int **board, int SIZE) {
 	// checks start from lower right corner, board is filled from the upper left
-	for (int i = SIZE-1; i > -1; i--)
-		for (int j = SIZE-1; j > -1; j--)
+	for (int i = SIZE-1; i >= 0; i--)
+		for (int j = SIZE-1; j >= 0; j--)
 			if (board[i][j] == 0)
 				return 0;
 		
