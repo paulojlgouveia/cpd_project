@@ -307,15 +307,26 @@ void getPuzzleFromFile(FILE *fp, int **board, int SIZE) {
 	}
 }
 
+// int **Board(int SIZE) {
+// 	int **board;
+// 	
+// 	board = (int**) malloc(SIZE * sizeof(int*));
+// 	for (int i = 0; i < SIZE; i++) 
+// 		board[i] = (int*) malloc(SIZE * sizeof(int));
+// 	
+// 	return board;
+// }
+
 int **Board(int SIZE) {
-	int **board;
-	
+	int **board, *data;
+	data = (int*) malloc(N*N * sizeof(int));
 	board = (int**) malloc(SIZE * sizeof(int*));
 	for (int i = 0; i < SIZE; i++) 
-		board[i] = (int*) malloc(SIZE * sizeof(int));
+		board[i] = &(data[N*i]);
 	
 	return board;
 }
+
 
 int ***Stack(int BOARD_SIZE, int DEPTH) {
 	int ***stack;
