@@ -28,11 +28,10 @@
 #define MAX_STACK_SIZE 9801
 #define MAX_BUFFER_SIZE 19926
 
-// #define size(n)			(n*n)
+// #define size(n)			n*n
 // #define size(n)			(n*n +5)
-// #define size(n)			((n+1)*(n+1))
+// #define size(n)			(n+1)*(n+1)
 #define size(n)			((n+1)*(n+1)+5)
-#define min(x, y)		((x < y)? (x) : (y))
 #define node(ptr)		&(stack[ptr][0][0])
 
 #define KILL 0
@@ -89,7 +88,7 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	
 	MPI_Comm_size(master_comm, &totalProcesses);
 	MPI_Comm_rank(new_comm, &processID);
-// 	printf("hello from %d.\n", processID);
+// 	printf("hello from %d master.\n", processID);
 	
 	
 	// read initial board from the input file
@@ -118,7 +117,7 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	stack = Stack(N, MAX_STACK_SIZE);
 	
 	stackPtr = expandNode(board, L, N, stack, MAX_STACK_SIZE);
-// 	printStack(stack, N, stackPtr);
+	printStack(stack, N, stackPtr);
 	
 	
 	time = omp_get_wtime();
@@ -127,16 +126,17 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	while(totalProcesses) {
 // 		MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);		
 		MPI_Recv(node(stackPtr), size(N), MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);
-
 		
 // 		printf("received:\n");
 // 		printBoard(stack[stackPtr], N); // FIXME remove print
+		
+		
 		if (!solved) {
 			switch (status.MPI_TAG) {
 				case SOLVED:
-					totalProcesses--;
-					stackPtr++;
-					copyBoard(stack[stackPtr-1], board, N);
+// 					totalProcesses--;
+// 					stackPtr++;
+					copyBoard(stack[stackPtr], board, N);
 					solved = 1;
 					printf("solved by %d.\n", status.MPI_SOURCE);
 					break;
@@ -144,6 +144,11 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 				case REQUEST:
 					if (stackPtr) {
 						stackPtr--;
+						
+// 						printf("sent:\n");
+// 						printBoard(stack[stackPtr], N);
+						
+						
 						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, master_comm);
 						
 					} else {
@@ -158,7 +163,7 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 			
 		} else {
 			printf("...%d\n", status.MPI_SOURCE);
-			if (status.MPI_TAG != SOLVED)
+// 			if (status.MPI_TAG != SOLVED)
 				MPI_Send(&board[0][0], size(N), MPI_INT, status.MPI_SOURCE, SOLVED, master_comm);
 			
 			totalProcesses--;
@@ -175,10 +180,11 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	printf("Time: %f seconds\n", time);
 	printBoard(board, N);
 	
-	printf("master %d finished.\n", processID);
+// 	// FIXME frees are giving out a munmap_chunk(): invalid pointer error
 // 	freeBoard(board, N);
 // 	freeStack(stack, N, MAX_STACK_SIZE);
-		
+	
+	printf("master %d finished.\n", processID);
 	return 0;
 }
 
@@ -194,10 +200,9 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 	
 	int solved = 0;
 	
-	
-	MPI_Comm_rank(new_comm, &processID);
-// 	printf("hello from %d.\n", processID);
 
+	MPI_Comm_rank(new_comm, &processID);
+	
 	// get block size and compute board size
 	MPI_Bcast(&L, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	N = L*L;
@@ -208,6 +213,7 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 	while(!solved) {
 		MPI_Send(node(stackPtr), size(N), MPI_INT, 0, REQUEST, master_comm);
 		MPI_Recv(&(board[0][0]), size(N), MPI_INT, 0, MPI_ANY_TAG, master_comm, &status);
+// 		MPI_Recv(board[0]), size(N), MPI_INT, 0, MPI_ANY_TAG, master_comm, &status);
 		
 // 		printf("received:\n");
 // 		printBoard(board, N); // FIXME remove print
@@ -239,10 +245,12 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 // 		MPI_Send(node(stackPtr), size(N), MPI_INT, 0, SOLVED, master_comm);
 	}
 	
-	printf("slave %d finished.\n", processID);
+	
+// 	// FIXME frees are giving out a munmap_chunk(): invalid pointer error
 // 	freeBoard(board, N);
 // 	freeStack(stack, N, N);
 	
+	printf("slave %d finished.\n", processID);
 	return 0;
 }
 
@@ -266,8 +274,12 @@ int main(int argc, char *argv[]) {
 		master(MPI_COMM_WORLD, new_comm, argv[1]);
 	else
 		slave(MPI_COMM_WORLD, new_comm);
-
+	
+	
+	
+// 	MPI_Comm_free(&new_comm);
 	MPI_Finalize();
+	printf("process %d returned\n", processID);
 	return 0;
 }
 
@@ -436,19 +448,31 @@ void printStack(int ***stack, int SIZE, int STACK_SIZE) {
 	char buffer[MAX_BUFFER_SIZE];
 	
 	bPtr += sprintf(buffer+bPtr, "<stack> (size: %d)\n", STACK_SIZE);
-	
-	for (int t = STACK_SIZE-1; t >= 0; t--) {
-		for (int i = 0; i < SIZE; i++) {
-			bPtr += sprintf(buffer+bPtr, "    ");
-			
-			for (int j = 0; j < SIZE; j++) {
-				bPtr += sprintf(buffer+bPtr, "%d ", stack[t][i][j]);
+	if (SIZE < 10) {
+		for (int t = STACK_SIZE-1; t >= 0; t--) {
+			for (int i = 0; i < SIZE; i++) {
+				bPtr += sprintf(buffer+bPtr, "    ");
+				
+				for (int j = 0; j < SIZE; j++) {
+					bPtr += sprintf(buffer+bPtr, "%d ", stack[t][i][j]);
+				}
+				bPtr += sprintf(buffer+bPtr, "\n");
 			}
-			
 			bPtr += sprintf(buffer+bPtr, "\n");
 		}
 		
-		bPtr += sprintf(buffer+bPtr, "\n");
+	} else {
+		for (int t = STACK_SIZE-1; t >= 0; t--) {
+			for (int i = 0; i < SIZE; i++) {
+				bPtr += sprintf(buffer+bPtr, "    ");
+				
+				for (int j = 0; j < SIZE; j++) {
+					bPtr += sprintf(buffer+bPtr, "%2d ", stack[t][i][j]);
+				}
+				bPtr += sprintf(buffer+bPtr, "\n");
+			}
+			bPtr += sprintf(buffer+bPtr, "\n");
+		}
 	}
 	
 	printf("%s</stack>\n\n", buffer);
