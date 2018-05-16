@@ -20,13 +20,16 @@
 #include <omp.h>
 #include <mpi.h>
 
-
+// respectively
 // 81 spaces, 162 cells (2 digits), '\n', '\0', possible '\r'
-#define MAX_LINE_SIZE 246
 // 9^2=81 => 81^2 + (81*80)/2 , board size + candidates per cell
+// MAX_LINE_SIZE * 81
+#define MAX_LINE_SIZE 246
 #define MAX_STACK_SIZE 9801
+#define MAX_BUFFER_SIZE 19926
 
-#define size(n)		((n+1)*(n+1))
+#define size(n)		((n+1)*(n+1)+5)
+// #define size(n)		(n*n)
 #define min(x, y)	((x < y)? (x) : (y))
 
 #define KILL 0
@@ -58,12 +61,13 @@ void freeStack(int ***stack, int BOARD_SIZE, int DEPTH);
 int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename);
 int slave(MPI_Comm master_comm, MPI_Comm new_comm);
 
+int expandNode(int **board, int BLOCK_SIZE, int BOARD_SIZE, int ***stack, int STACK_SIZE);
 int isValid(int row, int column, int number, int **board, int BLOCK_SIZE, int BOARD_SIZE);
 int isSolved(int **board, int SIZE);
-int expandNode(int **board, int BLOCK_SIZE, int BOARD_SIZE, int ***stack, int STACK_SIZE);
 
 void copyBoard(int **srcBoard, int **dstBoard, int BOARD_SIZE);
 void printBoard(int **board, int SIZE);
+void printStack(int ***stack, int SIZE, int STACK_SIZE);
 
 
 
@@ -119,9 +123,6 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	stack = Stack(N, MAX_STACK_SIZE);
 	
 	stackPtr = expandNode(board, L, N, stack, MAX_STACK_SIZE);
-	stackPtr--;
-	
-	printBoard(board, N); // FIXME remove print
 
 	
 	// FIXME generate at least 1 node per process?
@@ -132,12 +133,18 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 // 	}
 	
 	
+	
 	time = omp_get_wtime();
 	
 	
 // 	printf("stackPtr = %d\n", stackPtr);
 	while(!solved) {
+// 		MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);		
 		MPI_Recv(&(stack[stackPtr][0][0]), size(N), MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);
+
+		
+// 		printf("received:\n");
+// 		printBoard(stack[stackPtr], N); // FIXME remove print
 		
 		switch (status.MPI_TAG) {
 			case SOLVED:
@@ -148,17 +155,21 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 				
 			case REQUEST:
 				if (stackPtr) {
+// 				printf("request %d\n", size(N));
 					stackPtr--;
-					MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, master_comm);
+					MPI_Send(&(stack[stackPtr])[0][0], size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, master_comm);
 					
 				} else {
-					MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, status.MPI_SOURCE, TRY_AGAIN, master_comm);
+					MPI_Send(&(stack[stackPtr])[0][0], size(N), MPI_INT, status.MPI_SOURCE, TRY_AGAIN, master_comm);
 				}
+				
+// 				printf("sent:\n");
+// 				printBoard(stack[stackPtr], N); // FIXME remove print
+				
 				break;
 				
 			case NEW_NODE:
-				printBoard(stack[stackPtr], N); // FIXME remove print
-				// already added to stack at the loop start
+// 				MPI_Recv(&(stack[stackPtr][0][0]), size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, master_comm, &status);
 				stackPtr++;
 				break;
 		}
@@ -169,7 +180,7 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 
 	
 	time = omp_get_wtime() -time;
-	printf("solved: %d\nTime: %f seconds\n", isSolved(board, N), time);
+	printf("solved: %d\nTime: %f seconds\n", isSolved(stack[stackPtr], N), time);
 	printBoard(stack[stackPtr], N);
 	
 	freeBoard(board, N);
@@ -198,14 +209,14 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 	
 	board = Board(N);
 	stack = Stack(N, N);
-	
-	
-	
-	
 
 	while(!solved) {
 		MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, 0, REQUEST, master_comm);
-		MPI_Recv(&(board[0][0]), size(N), MPI_INT, 0, MPI_ANY_TAG, master_comm, &status);
+		MPI_Recv(&board[0][0], size(N), MPI_INT, 0, MPI_ANY_TAG, master_comm, &status);
+		
+// 		printf("received:\n");
+// 		printBoard(board, N); // FIXME remove print
+		
 		switch (status.MPI_TAG) {
 			case TRY_AGAIN:
 				break;
@@ -216,6 +227,9 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 				
 			case NEW_NODE:
 				stackPtr = expandNode(board, L, N, stack, N);
+				
+// 				printStack(stack, N, stackPtr);
+				
 				while(stackPtr) {
 					stackPtr--;
 					if (isSolved(stack[stackPtr], N))
@@ -223,8 +237,6 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 					else
 						MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, 0, NEW_NODE, master_comm);
 				}
-				
-// 				MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, 0, REQUEST, master_comm);
 				break;
 		}
 		
@@ -329,31 +341,10 @@ void freeStack(int ***stack, int BOARD_SIZE, int DEPTH) {
 	free(stack);
 }
 
+
 /****************************************************************************/
 
-int isValid(int row, int column, int number, int **board, int BLOCK_SIZE, int BOARD_SIZE) {
-	int rowStart = (row/BLOCK_SIZE) * BLOCK_SIZE;
-    int colStart = (column/BLOCK_SIZE) * BLOCK_SIZE;
-
-    for(int i = 0; i < BOARD_SIZE; ++i) {
-        if (board[row][i] == number)
-			return 0;
-		
-        if (board[i][column] == number)
-			return 0;
-		
-		int iFromBlock = rowStart + (i % BLOCK_SIZE);
-		int jFromBlock = colStart + (i / BLOCK_SIZE);
-		
-        if (board[iFromBlock][jFromBlock] == number)
-			return 0;
-    }
-    
-    return 1;
-}
-
 int expandNode(int **board, int BLOCK_SIZE, int BOARD_SIZE, int ***stack, int STACK_SIZE) {
-
 	int stackPtr = 0;
 	
 	int i = 0, j = 0;
@@ -381,6 +372,26 @@ int expandNode(int **board, int BLOCK_SIZE, int BOARD_SIZE, int ***stack, int ST
 	return stackPtr;	
 }
 
+int isValid(int row, int column, int number, int **board, int BLOCK_SIZE, int BOARD_SIZE) {
+	int rowStart = (row/BLOCK_SIZE) * BLOCK_SIZE;
+    int colStart = (column/BLOCK_SIZE) * BLOCK_SIZE;
+
+    for(int i = 0; i < BOARD_SIZE; ++i) {
+        if (board[row][i] == number)
+			return 0;
+		
+        if (board[i][column] == number)
+			return 0;
+		
+		int iFromBlock = rowStart + (i % BLOCK_SIZE);
+		int jFromBlock = colStart + (i / BLOCK_SIZE);
+		
+        if (board[iFromBlock][jFromBlock] == number)
+			return 0;
+    }
+    
+    return 1;
+}
 
 int isSolved(int **board, int SIZE) {
 	// checks start from lower right corner, board is filled from the upper left
@@ -393,32 +404,57 @@ int isSolved(int **board, int SIZE) {
 }
 
 
+/****************************************************************************/
+
 void copyBoard(int **srcBoard, int **dstBoard, int BOARD_SIZE) {
 	for (int i = 0; i < BOARD_SIZE; i++)
 		for (int j = 0; j < BOARD_SIZE; j++)
 			dstBoard[i][j] = srcBoard[i][j];
 }
 
-
-
 void printBoard(int **board, int SIZE) {
-	if (SIZE > 9) {
+	int bPtr = 0;
+	char buffer[MAX_LINE_SIZE];
+	
+	if (SIZE < 10) {
 		for (int i = 0; i < SIZE; i++) {
-			for (int j = 0; j < SIZE; j++) {
-				printf("%2d ", board[i][j]);
-			}
-			printf("\n");
+			for (int j = 0; j < SIZE; j++)
+				bPtr += sprintf(buffer+bPtr, "%d ", board[i][j]);
+			
+			bPtr += sprintf(buffer+bPtr, "\n");
 		}
 		
 	} else {
 		for (int i = 0; i < SIZE; i++) {
-			for (int j = 0; j < SIZE; j++) {
-				printf("%d ", board[i][j]);
-			}
-			printf("\n");
+			for (int j = 0; j < SIZE; j++)
+				bPtr += sprintf(buffer+bPtr, "%2d ", board[i][j]);
+			
+			bPtr += sprintf(buffer+bPtr, "\n");
 		}
 	}
-	printf("\n");
+	
+	printf("%s\n", buffer);
 }
 
-
+void printStack(int ***stack, int SIZE, int STACK_SIZE) {
+	int bPtr = 0;
+	char buffer[MAX_BUFFER_SIZE];
+	
+	bPtr += sprintf(buffer+bPtr, "<stack> (size: %d)\n", STACK_SIZE);
+	
+	for (int t = STACK_SIZE-1; t >= 0; t--) {
+		for (int i = 0; i < SIZE; i++) {
+			bPtr += sprintf(buffer+bPtr, "    ");
+			
+			for (int j = 0; j < SIZE; j++) {
+				bPtr += sprintf(buffer+bPtr, "%d ", stack[t][i][j]);
+			}
+			
+			bPtr += sprintf(buffer+bPtr, "\n");
+		}
+		
+		bPtr += sprintf(buffer+bPtr, "\n");
+	}
+	
+	printf("%s</stack>\n\n", buffer);
+}
