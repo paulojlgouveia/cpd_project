@@ -89,7 +89,8 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	
 	MPI_Comm_size(master_comm, &totalProcesses);
 	MPI_Comm_rank(new_comm, &processID);
-
+// 	printf("hello from %d.\n", processID);
+	
 	
 	// read initial board from the input file
 	fp = fopen(filename, "r");
@@ -137,6 +138,7 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 					stackPtr++;
 					copyBoard(stack[stackPtr-1], board, N);
 					solved = 1;
+					printf("solved by %d.\n", status.MPI_SOURCE);
 					break;
 					
 				case REQUEST:
@@ -155,6 +157,7 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 			}
 			
 		} else {
+			printf("...%d\n", status.MPI_SOURCE);
 			if (status.MPI_TAG != SOLVED)
 				MPI_Send(&board[0][0], size(N), MPI_INT, status.MPI_SOURCE, SOLVED, master_comm);
 			
@@ -172,8 +175,9 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	printf("Time: %f seconds\n", time);
 	printBoard(board, N);
 	
-	freeBoard(board, N);
-	freeStack(stack, N, MAX_STACK_SIZE);
+	printf("master %d finished.\n", processID);
+// 	freeBoard(board, N);
+// 	freeStack(stack, N, MAX_STACK_SIZE);
 		
 	return 0;
 }
@@ -192,7 +196,8 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 	
 	
 	MPI_Comm_rank(new_comm, &processID);
-	
+// 	printf("hello from %d.\n", processID);
+
 	// get block size and compute board size
 	MPI_Bcast(&L, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	N = L*L;
@@ -234,9 +239,9 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 // 		MPI_Send(node(stackPtr), size(N), MPI_INT, 0, SOLVED, master_comm);
 	}
 	
-	
-	freeBoard(board, N);
-	freeStack(stack, N, N);
+	printf("slave %d finished.\n", processID);
+// 	freeBoard(board, N);
+// 	freeStack(stack, N, N);
 	
 	return 0;
 }
