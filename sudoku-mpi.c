@@ -28,10 +28,8 @@
 #define MAX_STACK_SIZE 9801
 #define MAX_BUFFER_SIZE 19926
 
-// #define size(n)			n*n
-// #define size(n)			(n*n +5)
-// #define size(n)			(n+1)*(n+1)
-#define size(n)			((n+1)*(n+1)+5)
+#define size(n)			n*n
+#define table			&(board[0][0])
 #define node(ptr)		&(stack[ptr][0][0])
 
 #define KILL 0
@@ -77,6 +75,7 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	
 	int stackPtr = 0;
 	int ***stack;
+
 	
 	double time;
 	int solved = 0;
@@ -88,7 +87,6 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	
 	MPI_Comm_size(master_comm, &totalProcesses);
 	MPI_Comm_rank(new_comm, &processID);
-// 	printf("hello from %d master.\n", processID);
 	
 	
 	// read initial board from the input file
@@ -112,14 +110,11 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	}
 	
 	fclose(fp);
-	
+
 	
 	stack = Stack(N, MAX_STACK_SIZE);
-	
 	stackPtr = expandNode(board, L, N, stack, MAX_STACK_SIZE);
-	printStack(stack, N, stackPtr);
-	
-	
+
 	time = omp_get_wtime();
 	
 	totalProcesses--; // discount master
@@ -127,15 +122,9 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 // 		MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);		
 		MPI_Recv(node(stackPtr), size(N), MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);
 		
-// 		printf("received:\n");
-// 		printBoard(stack[stackPtr], N); // FIXME remove print
-		
-		
 		if (!solved) {
 			switch (status.MPI_TAG) {
 				case SOLVED:
-// 					totalProcesses--;
-// 					stackPtr++;
 					copyBoard(stack[stackPtr], board, N);
 					solved = 1;
 					printf("solved by %d.\n", status.MPI_SOURCE);
@@ -144,11 +133,6 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 				case REQUEST:
 					if (stackPtr) {
 						stackPtr--;
-						
-// 						printf("sent:\n");
-// 						printBoard(stack[stackPtr], N);
-						
-						
 						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, master_comm);
 						
 					} else {
@@ -162,29 +146,20 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 			}
 			
 		} else {
-			printf("...%d\n", status.MPI_SOURCE);
-// 			if (status.MPI_TAG != SOLVED)
-				MPI_Send(&board[0][0], size(N), MPI_INT, status.MPI_SOURCE, SOLVED, master_comm);
-			
+			MPI_Send(&board[0][0], size(N), MPI_INT, status.MPI_SOURCE, SOLVED, master_comm);
 			totalProcesses--;
 		}
-		
-		
-// 		getchar();
 	}
 
 	
 	time = omp_get_wtime() -time;
-	printf("received solved: %d\n", solved);
-	printf("local solved: %d\n", isSolved(board, N));
 	printf("Time: %f seconds\n", time);
 	printBoard(board, N);
 	
-// 	// FIXME frees are giving out a munmap_chunk(): invalid pointer error
-// 	freeBoard(board, N);
-// 	freeStack(stack, N, MAX_STACK_SIZE);
+	freeBoard(board, N);
+	freeStack(stack, N, MAX_STACK_SIZE);
 	
-	printf("master %d finished.\n", processID);
+	printf("bye master\n");
 	return 0;
 }
 
@@ -212,11 +187,7 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 
 	while(!solved) {
 		MPI_Send(node(stackPtr), size(N), MPI_INT, 0, REQUEST, master_comm);
-		MPI_Recv(&(board[0][0]), size(N), MPI_INT, 0, MPI_ANY_TAG, master_comm, &status);
-// 		MPI_Recv(board[0]), size(N), MPI_INT, 0, MPI_ANY_TAG, master_comm, &status);
-		
-// 		printf("received:\n");
-// 		printBoard(board, N); // FIXME remove print
+		MPI_Recv(table, size(N), MPI_INT, 0, MPI_ANY_TAG, master_comm, &status);
 		
 		switch (status.MPI_TAG) {
 			case TRY_AGAIN:
@@ -228,9 +199,6 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 				
 			case NEW_NODE:
 				stackPtr = expandNode(board, L, N, stack, N);
-				
-// 				printStack(stack, N, stackPtr);
-				
 				while(stackPtr) {
 					stackPtr--;
 					if (isSolved(stack[stackPtr], N))
@@ -240,17 +208,13 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 				}
 				break;
 		}
-		
-		
-// 		MPI_Send(node(stackPtr), size(N), MPI_INT, 0, SOLVED, master_comm);
 	}
 	
 	
-// 	// FIXME frees are giving out a munmap_chunk(): invalid pointer error
-// 	freeBoard(board, N);
-// 	freeStack(stack, N, N);
+	freeBoard(board, N);
+	freeStack(stack, N, N);
 	
-	printf("slave %d finished.\n", processID);
+	printf("bye %d\n", processID);
 	return 0;
 }
 
@@ -279,7 +243,6 @@ int main(int argc, char *argv[]) {
 	
 // 	MPI_Comm_free(&new_comm);
 	MPI_Finalize();
-	printf("process %d returned\n", processID);
 	return 0;
 }
 
@@ -316,45 +279,66 @@ void getPuzzleFromFile(FILE *fp, int **board, int SIZE) {
 // 	
 // 	return board;
 // }
+// 
+// int ***Stack(int BOARD_SIZE, int DEPTH) {
+// 	int ***stack;
+// 	
+// 	stack = (int***) malloc(DEPTH * sizeof(int**));
+// 	for (int t = 0; t < DEPTH; t++) {
+// 		stack[t] = (int**) malloc(BOARD_SIZE * sizeof(int*));
+// 		for (int i = 0; i < BOARD_SIZE; i++)
+// 			stack[t][i] = (int*) malloc(BOARD_SIZE * sizeof(int));
+// 	}
+// 	
+// 	return stack;
+// }
 
 int **Board(int SIZE) {
 	int **board, *data;
-	data = (int*) malloc(N*N * sizeof(int));
+	data = (int*) malloc(SIZE*SIZE * sizeof(int));
 	board = (int**) malloc(SIZE * sizeof(int*));
 	for (int i = 0; i < SIZE; i++) 
-		board[i] = &(data[N*i]);
+		board[i] = &(data[SIZE*i]);
 	
 	return board;
 }
 
-
 int ***Stack(int BOARD_SIZE, int DEPTH) {
-	int ***stack;
-	
-	stack = (int***) malloc(DEPTH * sizeof(int**));
-	for (int t = 0; t < DEPTH; t++) {
-		stack[t] = (int**) malloc(BOARD_SIZE * sizeof(int*));
-		for (int i = 0; i < BOARD_SIZE; i++)
-			stack[t][i] = (int*) malloc(BOARD_SIZE * sizeof(int));
-	}
+	int ***stack = (int***) malloc(DEPTH * sizeof(int**));
+	for (int t = 0; t < DEPTH; t++)
+		stack[t] = Board(BOARD_SIZE);
 	
 	return stack;
 }
 
+
+
+// void freeBoard(int **board, int SIZE) {
+// 	for (int i = 0; i < SIZE; i++)
+// 		free(board[i]);
+// 	
+// 	free(board);
+// }
+// 
+// void freeStack(int ***stack, int BOARD_SIZE, int DEPTH) {
+// 	for (int t = 0; t < DEPTH; t++) {
+// 		for (int i = 0; i < BOARD_SIZE; i++)
+// 			free(stack[t][i]);
+// 		
+// 		free(stack[t]);
+// 	}
+// 	
+// 	free(stack);
+// }
+
 void freeBoard(int **board, int SIZE) {
-	for (int i = 0; i < SIZE; i++)
-		free(board[i]);
-	
+	free(board[0]);
 	free(board);
 }
 
 void freeStack(int ***stack, int BOARD_SIZE, int DEPTH) {
-	for (int t = 0; t < DEPTH; t++) {
-		for (int i = 0; i < BOARD_SIZE; i++)
-			free(stack[t][i]);
-		
-		free(stack[t]);
-	}
+	for (int t = 0; t < DEPTH; t++)
+		freeBoard(stack[t], BOARD_SIZE);
 	
 	free(stack);
 }
