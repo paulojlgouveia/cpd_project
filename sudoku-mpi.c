@@ -28,9 +28,11 @@
 #define MAX_STACK_SIZE 9801
 #define MAX_BUFFER_SIZE 19926
 
-#define size(n)		((n+1)*(n+1)+5)
-// #define size(n)		(n*n)
-#define min(x, y)	((x < y)? (x) : (y))
+// #define size(n)			(n*n)
+// #define size(n)			(n*n +5)
+// #define size(n)			((n+1)*(n+1))
+#define size(n)			((n+1)*(n+1)+5)
+#define min(x, y)		((x < y)? (x) : (y))
 
 #define KILL 0
 #define SOLVED 1
@@ -123,8 +125,9 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	stack = Stack(N, MAX_STACK_SIZE);
 	
 	stackPtr = expandNode(board, L, N, stack, MAX_STACK_SIZE);
+	printStack(stack, N, stackPtr);
 
-	
+
 	// FIXME generate at least 1 node per process?
 // 	// send initial nodes; // 0 is master
 // 	for (p = 1; p < totalProcesses && stackPtr > 0; p++) {
@@ -136,8 +139,6 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	
 	time = omp_get_wtime();
 	
-	
-// 	printf("stackPtr = %d\n", stackPtr);
 	while(!solved) {
 // 		MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);		
 		MPI_Recv(&(stack[stackPtr][0][0]), size(N), MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);
@@ -149,23 +150,18 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 		switch (status.MPI_TAG) {
 			case SOLVED:
 				for (p = 1; p < totalProcesses; p++)
-					MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, p, SOLVED, master_comm);
+					MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, p, SOLVED, MPI_COMM_WORLD);
 				solved = 1;
 				break;
 				
 			case REQUEST:
 				if (stackPtr) {
-// 				printf("request %d\n", size(N));
 					stackPtr--;
-					MPI_Send(&(stack[stackPtr])[0][0], size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, master_comm);
+					MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, master_comm);
 					
 				} else {
-					MPI_Send(&(stack[stackPtr])[0][0], size(N), MPI_INT, status.MPI_SOURCE, TRY_AGAIN, master_comm);
-				}
-				
-// 				printf("sent:\n");
-// 				printBoard(stack[stackPtr], N); // FIXME remove print
-				
+					MPI_Send(&(stack[stackPtr][0][0]), size(N), MPI_INT, status.MPI_SOURCE, TRY_AGAIN, master_comm);
+				}				
 				break;
 				
 			case NEW_NODE:
@@ -185,6 +181,7 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	
 	freeBoard(board, N);
 	freeStack(stack, N, MAX_STACK_SIZE);
+		
 	return 0;
 }
 
@@ -271,7 +268,7 @@ int main(int argc, char *argv[]) {
 		master(MPI_COMM_WORLD, new_comm, argv[1]);
 	else
 		slave(MPI_COMM_WORLD, new_comm);
-	
+
 	MPI_Finalize();
 	return 0;
 }
@@ -325,7 +322,7 @@ int ***Stack(int BOARD_SIZE, int DEPTH) {
 
 void freeBoard(int **board, int SIZE) {
 	for (int i = 0; i < SIZE; i++)
-		free(board[i]);  
+		free(board[i]);
 	
 	free(board);
 }
