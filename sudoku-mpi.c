@@ -61,7 +61,7 @@ void copyBoard(int **srcBoard, int **dstBoard, int BOARD_SIZE);
 void printBoard(int **board, int SIZE);
 void printStack(int ***stack, int SIZE, int STACK_SIZE);
 
-
+int arraySum(int* array, int size);
 
 /****************************************************************************/
 
@@ -79,11 +79,15 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	
 	double time;
 	int solved = 0;
+	int progress = 1;
 
 	MPI_Status status;
 	int processID, totalProcesses;
 
-	
+	int tryAgains[totalProcesses];
+	int trySum = 0;
+	for(int i = 0; i < totalProcesses; i++)
+		tryAgains[i] = 0;
 	
 	MPI_Comm_size(master_comm, &totalProcesses);
 	MPI_Comm_rank(new_comm, &processID);
@@ -121,8 +125,10 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	while(totalProcesses > 0) {
 // 		MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);		
 		MPI_Recv(node(stackPtr), size(N), MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);
-		//printf("stackptr -> %d\n",stackPtr);
-		if (!solved) {
+		/*printf("stackptr -> %d\n",stackPtr);
+		printBoard(stack[stackPtr], N);
+		printf("tries -> %d\n", trySum);*/
+		if (!solved /*&& (trySum < totalProcesses)*/) {
 			switch (status.MPI_TAG) {
 				case SOLVED:
 					copyBoard(stack[stackPtr], board, N);
@@ -134,14 +140,23 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 					if (stackPtr) {
 						stackPtr--;
 						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, master_comm);
+						progress = 0;
 						
 					} else {
 						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, TRY_AGAIN, master_comm);
+						
+						/*tryAgains[status.MPI_SOURCE - 1] = 1;
+						trySum = arraySum(tryAgains,totalProcesses);*/
 					}
 					break;
 					
 				case NEW_NODE:
 					stackPtr++;
+
+					/*tryAgains[status.MPI_SOURCE - 1] = 0;
+					trySum = arraySum(tryAgains,totalProcesses);*/
+
+					progress = 1;
 					break;
 			}
 			
@@ -155,7 +170,10 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	
 	time = omp_get_wtime() -time;
 	printf("Time: %f seconds\n", time);
-	printBoard(board, N);
+	if(!solved)
+		printf("No solution! :(\n");
+	else
+		printBoard(board, N);
 	
 	freeBoard(board, N);
 	freeStack(stack, N, MAX_STACK_SIZE);
@@ -477,4 +495,12 @@ void printStack(int ***stack, int SIZE, int STACK_SIZE) {
 	}
 	
 	printf("%s</stack>\n\n", buffer);
+}
+
+int arraySum(int* array, int size){
+	int sum = 0;
+	for(int i = 0; i< size; i++)
+		sum += array[i];
+
+	return sum;
 }
