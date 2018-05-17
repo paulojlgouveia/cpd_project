@@ -88,7 +88,7 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	MPI_Comm_size(master_comm, &totalProcesses);
 	MPI_Comm_rank(new_comm, &processID);
 	
-	
+	printf("hellomaster %d\n", processID);
 	// read initial board from the input file
 	fp = fopen(filename, "r");
 	if (fp == NULL) {
@@ -118,10 +118,10 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	time = omp_get_wtime();
 	
 	totalProcesses--; // discount master
-	while(totalProcesses) {
+	while(totalProcesses > 0) {
 // 		MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);		
 		MPI_Recv(node(stackPtr), size(N), MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);
-		
+		//printf("stackptr -> %d\n",stackPtr);
 		if (!solved) {
 			switch (status.MPI_TAG) {
 				case SOLVED:
@@ -146,7 +146,8 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 			}
 			
 		} else {
-			MPI_Send(&board[0][0], size(N), MPI_INT, status.MPI_SOURCE, SOLVED, master_comm);
+			//printf("notifying totalProcesses!! %d\n", totalProcesses);
+			MPI_Send(&board[0][0], size(N), MPI_INT, totalProcesses, SOLVED, master_comm);
 			totalProcesses--;
 		}
 	}
@@ -176,8 +177,8 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 	int solved = 0;
 	
 
-	MPI_Comm_rank(new_comm, &processID);
-	
+	MPI_Comm_rank(MPI_COMM_WORLD, &processID);
+	printf("hello %d\n", processID);
 	// get block size and compute board size
 	MPI_Bcast(&L, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	N = L*L;
@@ -186,18 +187,23 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 	stack = Stack(N, N);
 
 	while(!solved) {
+		//printf("gonna send! %d\n", processID);
 		MPI_Send(node(stackPtr), size(N), MPI_INT, 0, REQUEST, master_comm);
+		//printf("gonna receive! %d\n", processID);
 		MPI_Recv(table, size(N), MPI_INT, 0, MPI_ANY_TAG, master_comm, &status);
 		
 		switch (status.MPI_TAG) {
 			case TRY_AGAIN:
+
 				break;
 				
 			case SOLVED:
+				//printf("solved! %d\n", processID);
 				solved = 1;
 				break;
 				
 			case NEW_NODE:
+			//printf("again! %d\n", processID);
 				stackPtr = expandNode(board, L, N, stack, N);
 				while(stackPtr) {
 					stackPtr--;
@@ -210,11 +216,11 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 		}
 	}
 	
-	
+	//printf("freein %d\n", processID);
 	freeBoard(board, N);
 	freeStack(stack, N, N);
 	
-	printf("bye %d\n", processID);
+	//printf("bye %d\n", processID);
 	return 0;
 }
 
