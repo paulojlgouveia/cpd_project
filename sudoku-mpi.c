@@ -137,7 +137,6 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 					break;
 					
 				case REQUEST:
-// 					printf("%d,  ", status.MPI_SOURCE);
 					if (stackPtr) {
 						stackPtr--;
 						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, master_comm);
@@ -148,12 +147,6 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 						tryAgains[status.MPI_SOURCE - 1]++;
 						if (allWaiting(tryAgains, totalProcesses))
 							solved = 1;
-						
-						// FIXME remove this print
-						for (t = 0; t < totalProcesses; t++)
-							printf("%d\n", tryAgains[t]);
-// 						getchar();
-						
 					}
 					break;
 					
@@ -166,19 +159,18 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 			}
 			
 		} else {
-			//printf("notifying totalProcesses!! %d\n", totalProcesses);
-			MPI_Send(&board[0][0], size(N), MPI_INT, totalProcesses, SOLVED, master_comm);
+// 			MPI_Send(table, size(N), MPI_INT, status.MPI_SOURCE, SOLVED, master_comm);
+			MPI_Send(table, size(N), MPI_INT, totalProcesses, SOLVED, master_comm);
 			totalProcesses--;
 		}
 	}
 
-	
 	time = omp_get_wtime() -time;
 	printf("Time: %f seconds\n", time);
 	if(isSolved(board, N))
 		printBoard(board, N);
 	else
-		printf("No solution.\n");
+		printf("No solution.\n");	
 	
 	freeBoard(board, N);
 	freeStack(stack, N, MAX_STACK_SIZE);
@@ -217,7 +209,6 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 		
 		switch (status.MPI_TAG) {
 			case TRY_AGAIN:
-
 				break;
 				
 			case SOLVED:
@@ -239,11 +230,9 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 		}
 	}
 	
-	//printf("freein %d\n", processID);
 	freeBoard(board, N);
 	freeStack(stack, N, N);
 	
-	//printf("bye %d\n", processID);
 	return 0;
 }
 
@@ -267,11 +256,11 @@ int main(int argc, char *argv[]) {
 		master(MPI_COMM_WORLD, new_comm, argv[1]);
 	else
 		slave(MPI_COMM_WORLD, new_comm);
-	
-	
+		
 	
 // 	MPI_Comm_free(&new_comm);
 	MPI_Finalize();
+	
 	return 0;
 }
 
@@ -403,7 +392,7 @@ void copyBoard(int **srcBoard, int **dstBoard, int BOARD_SIZE) {
 
 void printBoard(int **board, int SIZE) {
 	int bPtr = 0;
-	char buffer[MAX_LINE_SIZE];
+	char buffer[MAX_BUFFER_SIZE];
 	
 	if (SIZE < 10) {
 		for (int i = 0; i < SIZE; i++) {
