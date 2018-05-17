@@ -145,13 +145,13 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 					} else {
 						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, TRY_AGAIN, master_comm);
 						
-						tryAgains[status.MPI_SOURCE - 1] = 1;
+						tryAgains[status.MPI_SOURCE - 1]++;
 						if (allWaiting(tryAgains, totalProcesses))
 							solved = 1;
 						
 						// FIXME remove this print
-// 						for (t = 0; t < totalProcesses; t++)
-// 							printf("%d\n", tryAgains[t]);
+						for (t = 0; t < totalProcesses; t++)
+							printf("%d\n", tryAgains[t]);
 // 						getchar();
 						
 					}
@@ -462,7 +462,7 @@ void printStack(int ***stack, int SIZE, int STACK_SIZE) {
 
 int allWaiting(int *array, int SIZE) {
 	for (int t = 0; t < SIZE; t++)
-		if (array[t] == 0)
+		if (array[t] < 2)
 			return 0;
 
 	return 1;
