@@ -61,7 +61,7 @@ void copyBoard(int **srcBoard, int **dstBoard, int BOARD_SIZE);
 void printBoard(int **board, int SIZE);
 void printStack(int ***stack, int SIZE, int STACK_SIZE);
 
-int arraySum(int* array, int size);
+int allWaiting(int *array, int SIZE);
 
 /****************************************************************************/
 
@@ -78,21 +78,21 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 
 	
 	double time;
-	int solved = 0;
-	int progress = 1;
+	int solved = 0, *tryAgains;
+	int t = 0;
 
 	MPI_Status status;
 	int processID, totalProcesses;
-
-	int tryAgains[totalProcesses];
-	int trySum = 0;
-	for(int i = 0; i < totalProcesses; i++)
-		tryAgains[i] = 0;
+	
 	
 	MPI_Comm_size(master_comm, &totalProcesses);
 	MPI_Comm_rank(new_comm, &processID);
 	
-	printf("hellomaster %d\n", processID);
+	
+	tryAgains = malloc((totalProcesses-1) * sizeof(int));	
+	
+	
+// 	printf("hellomaster %d\n", processID);
 	// read initial board from the input file
 	fp = fopen(filename, "r");
 	if (fp == NULL) {
@@ -125,9 +125,7 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	while(totalProcesses > 0) {
 // 		MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);		
 		MPI_Recv(node(stackPtr), size(N), MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);
-		/*printf("stackptr -> %d\n",stackPtr);
-		printBoard(stack[stackPtr], N);
-		printf("tries -> %d\n", trySum);*/
+		
 		if (!solved /*&& (trySum < totalProcesses)*/) {
 			switch (status.MPI_TAG) {
 				case SOLVED:
@@ -140,23 +138,21 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 					if (stackPtr) {
 						stackPtr--;
 						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, master_comm);
-						progress = 0;
 						
 					} else {
 						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, TRY_AGAIN, master_comm);
 						
-						/*tryAgains[status.MPI_SOURCE - 1] = 1;
-						trySum = arraySum(tryAgains,totalProcesses);*/
+						tryAgains[status.MPI_SOURCE - 1] = 1;
+						if (allWaiting(tryAgains, totalProcesses))
+							solved = 1;
 					}
 					break;
 					
 				case NEW_NODE:
 					stackPtr++;
-
-					/*tryAgains[status.MPI_SOURCE - 1] = 0;
-					trySum = arraySum(tryAgains,totalProcesses);*/
-
-					progress = 1;
+					for (t = 0; t < totalProcesses; t++)
+						tryAgains[t] = 0;
+					
 					break;
 			}
 			
@@ -170,10 +166,10 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	
 	time = omp_get_wtime() -time;
 	printf("Time: %f seconds\n", time);
-	if(!solved)
-		printf("No solution! :(\n");
-	else
+	if(isSolved(board, N))
 		printBoard(board, N);
+	else
+		printf("No solution.\n");
 	
 	freeBoard(board, N);
 	freeStack(stack, N, MAX_STACK_SIZE);
@@ -294,28 +290,6 @@ void getPuzzleFromFile(FILE *fp, int **board, int SIZE) {
 	}
 }
 
-// int **Board(int SIZE) {
-// 	int **board;
-// 	
-// 	board = (int**) malloc(SIZE * sizeof(int*));
-// 	for (int i = 0; i < SIZE; i++) 
-// 		board[i] = (int*) malloc(SIZE * sizeof(int));
-// 	
-// 	return board;
-// }
-// 
-// int ***Stack(int BOARD_SIZE, int DEPTH) {
-// 	int ***stack;
-// 	
-// 	stack = (int***) malloc(DEPTH * sizeof(int**));
-// 	for (int t = 0; t < DEPTH; t++) {
-// 		stack[t] = (int**) malloc(BOARD_SIZE * sizeof(int*));
-// 		for (int i = 0; i < BOARD_SIZE; i++)
-// 			stack[t][i] = (int*) malloc(BOARD_SIZE * sizeof(int));
-// 	}
-// 	
-// 	return stack;
-// }
 
 int **Board(int SIZE) {
 	int **board, *data;
@@ -334,26 +308,6 @@ int ***Stack(int BOARD_SIZE, int DEPTH) {
 	
 	return stack;
 }
-
-
-
-// void freeBoard(int **board, int SIZE) {
-// 	for (int i = 0; i < SIZE; i++)
-// 		free(board[i]);
-// 	
-// 	free(board);
-// }
-// 
-// void freeStack(int ***stack, int BOARD_SIZE, int DEPTH) {
-// 	for (int t = 0; t < DEPTH; t++) {
-// 		for (int i = 0; i < BOARD_SIZE; i++)
-// 			free(stack[t][i]);
-// 		
-// 		free(stack[t]);
-// 	}
-// 	
-// 	free(stack);
-// }
 
 void freeBoard(int **board, int SIZE) {
 	free(board[0]);
@@ -497,10 +451,10 @@ void printStack(int ***stack, int SIZE, int STACK_SIZE) {
 	printf("%s</stack>\n\n", buffer);
 }
 
-int arraySum(int* array, int size){
-	int sum = 0;
-	for(int i = 0; i< size; i++)
-		sum += array[i];
+int allWaiting(int *array, int SIZE) {
+	for (int t = 0; t < SIZE; t++)
+		if (array[t] == 0)
+			return 0;
 
-	return sum;
+	return 1;
 }
