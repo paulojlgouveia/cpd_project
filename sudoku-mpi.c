@@ -89,8 +89,10 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	MPI_Comm_rank(new_comm, &processID);
 	
 	
-	tryAgains = malloc((totalProcesses-1) * sizeof(int));	
-	
+	totalProcesses--; // discount master
+	tryAgains = malloc(totalProcesses * sizeof(int));	
+	for (t = 0; t < totalProcesses; t++)
+		tryAgains[t] = 0;
 	
 // 	printf("hellomaster %d\n", processID);
 	// read initial board from the input file
@@ -119,9 +121,9 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	stack = Stack(N, MAX_STACK_SIZE);
 	stackPtr = expandNode(board, L, N, stack, MAX_STACK_SIZE);
 
+	
 	time = omp_get_wtime();
 	
-	totalProcesses--; // discount master
 	while(totalProcesses > 0) {
 // 		MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);		
 		MPI_Recv(node(stackPtr), size(N), MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);
@@ -145,6 +147,12 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 						tryAgains[status.MPI_SOURCE - 1] = 1;
 						if (allWaiting(tryAgains, totalProcesses))
 							solved = 1;
+						
+						// FIXME remove this print
+						for (t = 0; t < totalProcesses; t++)
+							printf("%d\n", tryAgains[t]);
+// 						getchar();
+						
 					}
 					break;
 					
