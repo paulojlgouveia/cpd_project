@@ -137,6 +137,7 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 					break;
 					
 				case REQUEST:
+// 					printf("%d,  ", status.MPI_SOURCE);
 					if (stackPtr) {
 						stackPtr--;
 						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, master_comm);
@@ -149,8 +150,8 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 							solved = 1;
 						
 						// FIXME remove this print
-						for (t = 0; t < totalProcesses; t++)
-							printf("%d\n", tryAgains[t]);
+// 						for (t = 0; t < totalProcesses; t++)
+// 							printf("%d\n", tryAgains[t]);
 // 						getchar();
 						
 					}
@@ -182,7 +183,7 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	freeBoard(board, N);
 	freeStack(stack, N, MAX_STACK_SIZE);
 	
-	printf("bye master\n");
+// 	printf("bye master\n");
 	return 0;
 }
 
@@ -200,7 +201,7 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 	
 
 	MPI_Comm_rank(MPI_COMM_WORLD, &processID);
-	printf("hello %d\n", processID);
+// 	printf("hello %d\n", processID);
 	// get block size and compute board size
 	MPI_Bcast(&L, 1, MPI_INT, 0, MPI_COMM_WORLD);
 	N = L*L;
