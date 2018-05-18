@@ -22,10 +22,9 @@ SERIAL_FLAGS=-fopenmp -ansi -pedantic -Wall -Wno-unused-result -O3 -lm -std=c99
 MPI_FLAGS=-fopenmp -ansi -pedantic -Wall -Wno-unused-result -O3 -lm -std=c99
 
 
-# FILES=4x4.in 4x4-nosol.in 9x9.in 9x9-nosol.in 16x16-zeros.in 16x16.in 16x16-nosol.in
-FILES=16x16.in 16x16-nosol.in
+FILES=4x4.in 4x4-nosol.in 9x9.in 9x9-nosol.in 16x16-zeros.in 16x16.in 16x16-nosol.in
 TURNS=0 1 2 3 4 5 6 7 8 9
-PROCESSES=8 4 2 16
+PROCESSES=2 4 8 16
 
 
 #################################################################################################
@@ -53,9 +52,15 @@ clean:
 	@rm -f *.zip
 	@rm -f massif.out.*
 
-
-serial:
+	
+compile-serial:
 	gcc $(SERIAL_FLAGS) sudoku-serial.c -o sudoku-serial
+	
+compile-mpi:
+	mpicc $(MPI_FLAGS) sudoku-mpi.c -o sudoku-mpi
+	
+
+serial: compile-serial
 	@for f in ${FILES}; do \
 		echo '\n'$$f; \
 		(for i in ${turns}; do \
@@ -64,8 +69,7 @@ serial:
 	done
 
 
-mpi:
-	mpicc $(MPI_FLAGS) sudoku-mpi.c -o sudoku-mpi
+mpi: compile-mpi
 	@for f in ${FILES}; do \
 		for p in ${PROCESSES}; do \
 			echo '\n'$$p' - '$$f; \
