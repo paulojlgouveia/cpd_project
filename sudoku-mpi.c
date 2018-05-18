@@ -133,7 +133,7 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 				case SOLVED:
 					copyBoard(stack[stackPtr], board, N);
 					solved = 1;
-					printf("solved by %d.\n", status.MPI_SOURCE);
+// 					printf("solved by %d.\n", status.MPI_SOURCE);
 					break;
 					
 				case REQUEST:
@@ -166,12 +166,15 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	}
 
 	time = omp_get_wtime() -time;
-	printf("Time: %f seconds\n", time);
-	if(isSolved(board, N))
-		printBoard(board, N);
-	else
-		printf("No solution.\n");	
+// 	printf("Time: %f seconds\n", time);
+	printf("%f\n", time);
 	
+// 	if(isSolved(board, N))
+// 		printBoard(board, N);
+// 	else
+// 		printf("No solution.\n");	
+	
+	free(tryAgains);
 	freeBoard(board, N);
 	freeStack(stack, N, MAX_STACK_SIZE);
 	

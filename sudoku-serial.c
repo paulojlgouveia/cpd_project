@@ -74,8 +74,9 @@ int main(int argc, char *argv[]) {
 	time = omp_get_wtime();
 // 	if (recursiveSolve(board, 0, 0)) {
 	if (iterativeSolve(board)) {
-		printBoard(board);
-		
+// 		printBoard(board);
+		printf("solved.\n");
+
 	} else {
 		printf("No solution.\n");
 	}

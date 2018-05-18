@@ -22,6 +22,14 @@ SERIAL_FLAGS=-fopenmp -ansi -pedantic -Wall -Wno-unused-result -O3 -lm -std=c99
 MPI_FLAGS=-fopenmp -ansi -pedantic -Wall -Wno-unused-result -O3 -lm -std=c99
 
 
+# FILES=4x4.in 4x4-nosol.in 9x9.in 9x9-nosol.in 16x16-zeros.in 16x16.in 16x16-nosol.in
+FILES=16x16.in 16x16-nosol.in
+TURNS=0 1 2 3 4 5 6 7 8 9
+PROCESSES=8 4 2 16
+
+
+#################################################################################################
+
 install:
 	sudo apt-get install expect
 	sudo apt-get install libopenmpi-dev openmpi-bin
@@ -48,18 +56,24 @@ clean:
 
 serial:
 	gcc $(SERIAL_FLAGS) sudoku-serial.c -o sudoku-serial
-	valgrind -v --leak-check=full --show-leak-kinds=all ./sudoku-serial input/9x9.in
+	@for f in ${FILES}; do \
+		echo '\n'$$f; \
+		(for i in ${turns}; do \
+			./sudoku-serial input/$$f; \
+		done) \
+	done
 
 
 mpi:
 	mpicc $(MPI_FLAGS) sudoku-mpi.c -o sudoku-mpi
-# 	mpirun -np 6 sudoku-mpi input/4x4.in
-# 	mpirun -np 6 sudoku-mpi input/4x4-nosol.in
-# 	mpirun -np 6 sudoku-mpi input/9x9.in
-# 	mpirun -np 8 sudoku-mpi input/9x9-nosol.in
-	mpirun -np 8 sudoku-mpi input/16x16-zeros.in
-# 	mpirun -np 8 sudoku-mpi input/16x16.in
-# 	valgrind -v --leak-check=full --show-leak-kinds=all mpirun -np 4 sudoku-mpi input/9x9.in
+	@for f in ${FILES}; do \
+		for p in ${PROCESSES}; do \
+			echo '\n'$$p' - '$$f; \
+			for i in ${TURNS}; do \
+				mpirun -np $$p sudoku-mpi input/$$f; \
+			done \
+		done \
+	done
 	
 	
 	
