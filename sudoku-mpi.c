@@ -50,8 +50,8 @@ int ***Stack(int BOARD_SIZE, int DEPTH);
 void freeBoard(int **board, int SIZE);
 void freeStack(int ***stack, int BOARD_SIZE, int DEPTH);
 
-int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename);
-int slave(MPI_Comm master_comm, MPI_Comm new_comm);
+int master(char *filename);
+int slave();
 
 int expandNode(int **board, int BLOCK_SIZE, int BOARD_SIZE, int ***stack, int STACK_SIZE);
 int isValid(int row, int column, int number, int **board, int BLOCK_SIZE, int BOARD_SIZE);
@@ -65,7 +65,7 @@ int allWaiting(int *array, int SIZE);
 
 /****************************************************************************/
 
-int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
+int master( char *filename) {
 	
 	FILE *fp;
 	char buffer[64];
@@ -85,8 +85,8 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	int processID, totalProcesses;
 	
 	
-	MPI_Comm_size(master_comm, &totalProcesses);
-	MPI_Comm_rank(new_comm, &processID);
+	MPI_Comm_size(MPI_COMM_WORLD, &totalProcesses);
+	MPI_Comm_rank(MPI_COMM_WORLD, &processID);
 	
 	
 	// discount master and create a vector for slaves waiting for work
@@ -125,7 +125,7 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 	time = omp_get_wtime();
 	
 	while(totalProcesses > 0) {
-		MPI_Recv(node(stackPtr), size(N), MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, master_comm, &status);
+		MPI_Recv(node(stackPtr), size(N), MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 		
 		if (!solved) {
 			switch (status.MPI_TAG) {
@@ -138,10 +138,10 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 				case REQUEST:
 					if (stackPtr) {
 						stackPtr--;
-						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, master_comm);
+						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, MPI_COMM_WORLD);
 						
 					} else {
-						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, TRY_AGAIN, master_comm);
+						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, TRY_AGAIN, MPI_COMM_WORLD);
 						
 						// take note of processes waiting for work
 						tryAgains[status.MPI_SOURCE-1]++;
@@ -159,7 +159,7 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 			}
 			
 		} else {
-			MPI_Send(table, size(N), MPI_INT, totalProcesses, SOLVED, master_comm);
+			MPI_Send(table, size(N), MPI_INT, totalProcesses, SOLVED, MPI_COMM_WORLD);
 			totalProcesses--;
 		}
 	}
@@ -180,7 +180,7 @@ int master(MPI_Comm master_comm, MPI_Comm new_comm, char *filename) {
 }
 
 
-int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
+int slave() {
 	int processID;
 	MPI_Status status;
 	
@@ -202,8 +202,8 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 	stack = Stack(N, N);
 
 	while(!solved) {
-		MPI_Send(node(stackPtr), size(N), MPI_INT, 0, REQUEST, master_comm);
-		MPI_Recv(table, size(N), MPI_INT, 0, MPI_ANY_TAG, master_comm, &status);
+		MPI_Send(node(stackPtr), size(N), MPI_INT, 0, REQUEST, MPI_COMM_WORLD);
+		MPI_Recv(table, size(N), MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 		
 		switch (status.MPI_TAG) {
 			case TRY_AGAIN:
@@ -218,9 +218,9 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 				while(stackPtr) {
 					stackPtr--;
 					if (isSolved(stack[stackPtr], N))
-						MPI_Send(node(stackPtr), size(N), MPI_INT, 0, SOLVED, master_comm);
+						MPI_Send(node(stackPtr), size(N), MPI_INT, 0, SOLVED, MPI_COMM_WORLD);
 					else
-						MPI_Send(node(stackPtr), size(N), MPI_INT, 0, NEW_NODE, master_comm);
+						MPI_Send(node(stackPtr), size(N), MPI_INT, 0, NEW_NODE, MPI_COMM_WORLD);
 				}
 				break;
 		}
@@ -236,7 +236,6 @@ int slave(MPI_Comm master_comm, MPI_Comm new_comm) {
 
 int main(int argc, char *argv[]) {
 	int processID;
-	MPI_Comm new_comm;
 	
 	
 	if(argc < 2){
@@ -246,15 +245,14 @@ int main(int argc, char *argv[]) {
 
 	MPI_Init(&argc, &argv);
 	MPI_Comm_rank(MPI_COMM_WORLD, &processID);
-	MPI_Comm_split(MPI_COMM_WORLD, processID == 0, 0, &new_comm);
 	
 	if (processID == 0)
-		master(MPI_COMM_WORLD, new_comm, argv[1]);
+		master(argv[1]);
 	else
-		slave(MPI_COMM_WORLD, new_comm);
+		slave();
 		
 	
-	MPI_Comm_free(&new_comm);
+	//MPI_Comm_free(&MPI_COMM_WORLD);
 	MPI_Finalize();
 	
 	return 0;
