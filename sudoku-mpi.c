@@ -138,7 +138,10 @@ int master( char *filename) {
 				case REQUEST:
 					if (stackPtr) {
 						stackPtr--;
+						for (t = 0; t < totalProcesses; t++)
+							tryAgains[t] = 0;
 						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, NEW_NODE, MPI_COMM_WORLD);
+
 						
 					} else {
 						MPI_Send(node(stackPtr), size(N), MPI_INT, status.MPI_SOURCE, TRY_AGAIN, MPI_COMM_WORLD);
@@ -152,8 +155,7 @@ int master( char *filename) {
 					
 				case NEW_NODE:
 					stackPtr++;
-					for (t = 0; t < totalProcesses; t++)
-						tryAgains[t] = 0;
+
 					
 					break;
 			}
@@ -445,7 +447,7 @@ void printStack(int ***stack, int SIZE, int STACK_SIZE) {
 
 int allWaiting(int *array, int SIZE) {
 	for (int t = 0; t < SIZE; t++)
-		if (array[t] < 2)
+		if (array[t] < 1)
 			return 0;
 	
 	return 1;
